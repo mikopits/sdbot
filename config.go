@@ -1,9 +1,12 @@
-package bot
+package sdbot
 
 import (
-	"github.com/BurntSushi/toml"
+	"bytes"
 	"log"
 	"os"
+	"regexp"
+
+	"github.com/BurntSushi/toml"
 )
 
 // Information from config file
@@ -12,13 +15,15 @@ type Config struct {
 	Port              string
 	Nick              string
 	Password          string
-	MessagesPerSecond int
+	MessagesPerSecond float64
 	Rooms             []string
-	Avatar            int
+	Avatar            string
+	PluginPrefixes    []string
+	PluginPrefix      *regexp.Regexp
 }
 
-// Read the config data
-func ReadConfig() Config {
+// Read the config data from toml
+func ReadConfig() *Config {
 	configfile := "config.toml"
 	_, err := os.Stat(configfile)
 	if err != nil {
@@ -30,6 +35,17 @@ func ReadConfig() Config {
 		log.Fatal(err)
 	}
 
+	config.generatePluginPrefixRegexp()
 	log.Print(config)
-	return config
+	return &config
+}
+
+func (c *Config) generatePluginPrefixRegexp() {
+	var buffer bytes.Buffer
+
+	for _, prefix := range c.PluginPrefixes {
+		buffer.WriteString(prefix)
+	}
+
+	c.PluginPrefix = regexp.MustCompile("^" + regexp.QuoteMeta(buffer.String()))
 }
