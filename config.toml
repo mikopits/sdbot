@@ -1,0 +1,7 @@
+server = "sim.smogon.com"
+port = "8000"
+nick = ""
+password = ""
+messages_per_second = 3
+rooms = [] # The rooms you want to bot to join
+avatar = 0 # Set to 0 to get a default avatar
