@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -85,8 +86,14 @@ func (c *Connection) Connect() {
 	defer c.ws.Close()
 	defer PingTicker.Stop()
 
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	c.startReadingThread()
+	defer wg.Done()
 	c.startSendingThread()
+	defer wg.Done()
+	wg.Wait()
 }
 
 func (c *Connection) startReadingThread() {
