@@ -1,7 +1,6 @@
 package sdbot
 
 import (
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +16,7 @@ type Message struct {
 	Room      *Room
 	User      *User
 	Auth      string
-	Target    *Target
+	Target    Target
 	Message   string
 }
 
@@ -33,7 +32,7 @@ func NewMessage(rawMessage string, bot *Bot) *Message {
 
 // Parse a raw message and return data in the following order:
 // Command, Params, Timestamp, Room, User, Auth, Target, Message
-func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string, *Target, string) {
+func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string, Target, string) {
 	newlineDelimited := strings.Split(s, "\n")
 	vertbarDelimited := strings.Split(s, "|")
 	var command string
@@ -42,7 +41,6 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	var room *Room
 	var user *User
 	var auth string
-	var target *Target
 	var message string
 
 	// The command is always after the first vertical bar.
@@ -64,7 +62,7 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	if strings.Contains(command, ":") {
 		timestamp, err = strconv.Atoi(params[0])
 		if err != nil {
-			log.Println("timestamp string conversion:", err)
+			Error(&Log, err)
 		}
 	} else {
 		timestamp = 0
@@ -73,7 +71,7 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	// If the message starts with a ">" then it comes from a room.
 	if string(newlineDelimited[0][0]) == ">" {
 		room = &Room{Name: string(newlineDelimited[0][1:])}
-		b.RoomList[*room] = true
+		b.RoomList[room] = true
 	} else {
 		room = &Room{}
 	}
@@ -83,11 +81,11 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	case "c:":
 		auth = string(vertbarDelimited[3][0])
 		user = &User{Name: string(vertbarDelimited[3][1:])}
-		b.UserList[*user] = true
+		b.UserList[user] = true
 	case "c", "j", "l", "n", "pm":
 		auth = string(vertbarDelimited[2][0])
 		user = &User{Name: string(vertbarDelimited[2][1:])}
-		b.UserList[*user] = true
+		b.UserList[user] = true
 	default:
 		auth = ""
 		user = &User{}
@@ -95,16 +93,12 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 
 	// Decide the target
 	if strings.ToLower(command) == "pm" {
-		*target = user
-	} else {
-		*target = room
+		return command, params, timestamp, room, user, auth, user, message
 	}
 
-	return command, params, timestamp, room, user, auth, target, message
+	return command, params, timestamp, room, user, auth, room, message
 }
 
 func (m *Message) Reply(res string, bot *Bot) {
-	var target Target
-	target = *(m.Target)
-	target.Reply(res, m, bot)
+	m.Target.Reply(res, m, bot)
 }

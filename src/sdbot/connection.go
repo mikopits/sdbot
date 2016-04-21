@@ -1,9 +1,8 @@
 package sdbot
 
 import (
-	"bytes"
 	"errors"
-	"log"
+	"fmt"
 	"math"
 	"net/http"
 	"net/url"
@@ -16,30 +15,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Define function handlers to call depending on the command we get.
-var handlers = map[string]interface{}{
-	"challstr":   onChallstr,
-	"updateuser": onUpdateuser,
-	"l":          onLeave,
-	"j":          onJoin,
-	"n":          onNick,
-	"init":       onInit,
-	"deinit":     onDeinit,
-	"users":      onUsers,
-	"popup":      onPopup,
-	"c:":         onChat,
-	"pm":         onPrivateMessage,
-	"tournament": onTournament,
-}
-
-// The time at which the bot logs in.
 var LoginTime int
 
-// Timer used to periodically ping the server.
 var PingTicker *time.Ticker
 
+var interrupt chan os.Signal
+
 // ErrUnexpectedMessageType is returned when we receive a message from the
-// websocket that isn't a websocket.TextMessage.
+// websocket that isn't a websocket.TextMessage or websocket.CloseNormalClosure.
 var ErrUnexpectedMessageType = errors.New("sdbot: unexpected message type from the websocket")
 
 type Connection struct {
@@ -50,20 +33,11 @@ type Connection struct {
 	outQueue  chan string
 }
 
-//func NewConnection(bot *Bot) *Connection {
-//	return &Connection{
-//		Bot:       bot,
-//		Connected: false,
-//		inQueue:   make(chan string, 128),
-//		outQueue:  make(chan string, 128),
-//	}
-//}
-
 // Connect to the server websocket and initialize reading and writing threads.
 func (c *Connection) Connect() {
 	host := c.Bot.Config.Server + ":" + c.Bot.Config.Port
 	u := url.URL{Scheme: "ws", Host: host, Path: "/showdown/websocket"}
-	log.Printf("connecting to %s", u.String())
+	Info(&Log, fmt.Sprintf("Connecting to %s...", u.String()))
 
 	var res *http.Response
 	var err error
@@ -71,14 +45,14 @@ func (c *Connection) Connect() {
 		"Origin": []string{"https://play.pokemonshowdown.com"},
 	})
 	if err != nil {
-		log.Fatal("dial:", err)
+		Error(&Log, err)
 	}
 
 	c.Connected = true
 
 	PingTicker = time.NewTicker(time.Minute)
 	c.ws.SetPongHandler(func(s string) error {
-		log.Println("received pong:", s)
+		Info(&Log, fmt.Sprintf("Received pong: %s", s))
 		return nil
 	})
 
@@ -97,47 +71,50 @@ func (c *Connection) Connect() {
 }
 
 func (c *Connection) startReadingThread() {
+	// Listen for messages from the websocket
 	go func() error {
 		for {
 			msgType, msg, err := c.ws.ReadMessage()
 			if err != nil {
-				log.Println("readthread:", err)
+				Error(&Log, err)
 			}
 
-			if msgType != websocket.TextMessage {
-				return ErrUnexpectedMessageType
+			if msgType != websocket.TextMessage || msgType != websocket.CloseNormalClosure {
+				err = ErrUnexpectedMessageType
+				Error(&Log, err)
+				return err
 			}
 
-			log.Printf("\nReceived: %s.\n", msg)
+			Incoming(&Log, string(msg))
 			c.inQueue <- string(msg)
 		}
 		return nil
 	}()
 
+	// Parse the messages and do stuff with them
 	go func() {
 		for {
 			select {
 			case event := <-c.inQueue:
 				var room string
-				messages := strings.Split(event, "\n")
+
+				messages := strings.Split(event, `\n`)
 				if string([]rune(messages[0])[0]) == ">" {
 					room, messages = messages[0], messages[1:]
 				}
 
-				var buffer bytes.Buffer
 				for _, rawMessage := range messages {
-					buffer.WriteString(room)
-					buffer.WriteString("\n")
-					buffer.WriteString(rawMessage)
-					parse(buffer.String(), c.Bot)
+					parse(strings.Join([]string{room, `\n`, rawMessage}, ""), c.Bot)
 				}
+			case <-interrupt:
+				return
 			}
 		}
 	}()
 }
 
 func (c *Connection) startSendingThread() {
-	interrupt := make(chan os.Signal, 1)
+	interrupt = make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	done := make(chan struct{})
 
@@ -149,16 +126,19 @@ func (c *Connection) startSendingThread() {
 				ms := math.Floor(1000.0 / c.Bot.Config.MessagesPerSecond)
 				time.Sleep(time.Duration(ms) * time.Millisecond)
 			case <-interrupt:
-				log.Println("interrupt")
+				Warn(&Log, "Process was interrupted. Closing connection...")
+
 				// Send a close frame and wait for the server to close the connection.
 				err := c.ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 				if err != nil {
-					log.Println("write close:", err)
+					Error(&Log, err)
 					return
 				}
 				select {
 				case <-done:
+					os.Exit(15)
 				case <-time.After(time.Second):
+					os.Exit(15)
 				}
 				c.ws.Close()
 				c.Connected = false
@@ -176,10 +156,11 @@ func (c *Connection) QueueMessage(msg string) {
 
 // Sends a message upstream to the websocket.
 func Send(c *Connection, s string) {
-	log.Printf("\nSent message: %s\n", s)
+	Outgoing(&Log, s)
+
 	err := c.ws.WriteMessage(websocket.TextMessage, []byte(s))
 	if err != nil {
-		log.Println("send:", err)
+		Error(&Log, err)
 	}
 }
 
@@ -195,6 +176,7 @@ func parse(s string, b *Bot) {
 	switch cmd {
 	case ":":
 		LoginTime = msg.Timestamp
+		Debug(&Log, fmt.Sprintf("LoginTime: %d", LoginTime))
 	case "c":
 		if msg.Params[0] != "~" {
 			events <- "message"
@@ -202,7 +184,5 @@ func parse(s string, b *Bot) {
 	}
 
 	events <- cmd
-	Call(handlers, cmd, msg, events)
+	CallHandler(Handlers, cmd, msg, events)
 }
-
-// TODO Handlers and dispatching them on events

@@ -1,7 +1,6 @@
 package sdbot
 
 import (
-	"log"
 	"regexp"
 	"strings"
 )
@@ -13,7 +12,7 @@ import (
 func Sanitize(s string) string {
 	reg, err := regexp.Compile("[^A-Za-z0-9]")
 	if err != nil {
-		log.Fatal(err)
+		Error(&Log, err)
 	}
 
 	return strings.ToLower(reg.ReplaceAllString(s, ""))

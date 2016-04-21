@@ -2,7 +2,7 @@ package sdbot
 
 import (
 	"bytes"
-	"log"
+	"fmt"
 	"os"
 	"regexp"
 
@@ -27,16 +27,15 @@ func ReadConfig() *Config {
 	configfile := "config.toml"
 	_, err := os.Stat(configfile)
 	if err != nil {
-		log.Fatal("Config file is missing: ", configfile)
+		Fatal(&Log, fmt.Sprintf("Config file is missing: %s", configfile))
 	}
 
 	var config Config
 	if _, err := toml.DecodeFile(configfile, &config); err != nil {
-		log.Fatal(err)
+		Error(&Log, err)
 	}
 
 	config.generatePluginPrefixRegexp()
-	log.Print(config)
 	return &config
 }
 

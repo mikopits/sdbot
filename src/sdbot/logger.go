@@ -2,64 +2,69 @@ package sdbot
 
 import (
 	"io"
-	"os"
 	"sync"
 )
 
 const (
-	LevelDebug     = 0
-	LevelLog       = 1
-	LevelIncoming  = 10
-	LevelOutgoing  = 11
-	LevelInfo      = 2
-	LevelWarn      = 3
-	LevelError     = 4
-	LevelException = 40
-	LevelFatal     = 5
+	LevelDebug    = 0
+	LevelLog      = 1
+	LevelIncoming = 10
+	LevelOutgoing = 11
+	LevelInfo     = 2
+	LevelWarn     = 3
+	LevelError    = 4
+	LevelFatal    = 5
 )
 
-var DefaultWriter = os.Stderr
-
-type DefaultLogger struct {
+type AnyLogger struct {
 	Output io.Writer
 	mutex  sync.Mutex // Safely access the logger concurrently
 }
 
+func (lo *AnyLogger) GetLogger() *AnyLogger {
+	return lo
+}
+
+type DefaultLogger struct {
+	AnyLogger
+}
+
 // Log debug messages at different levels of severity.
 func Debug(lo *Logger, s string) {
-	go lo.log(s, LevelDebug)
+	go log(lo, s, LevelDebug)
 }
 
 func Info(lo *Logger, s string) {
-	go lo.log(s, LevelInfo)
+	go log(lo, s, LevelInfo)
 }
 
 func Warn(lo *Logger, s string) {
-	go lo.log(s, LevelWarn)
+	go log(lo, s, LevelWarn)
 }
 
-func Error(lo *Logger, s string) {
-	go lo.log(s, LevelError)
+func Error(lo *Logger, e error) {
+	go log(lo, e.Error(), LevelError)
 }
 
 func Fatal(lo *Logger, s string) {
-	go lo.log(s, LevelFatal)
+	go log(lo, s, LevelFatal)
 }
 
 // Log messages sent to and from the websocket.
 func Incoming(lo *Logger, s string) {
-	go lo.log(s, LevelIncoming)
+	go log(lo, s, LevelIncoming)
 }
 
 func Outgoing(lo *Logger, s string) {
-	go lo.log(s, LevelOutgoing)
+	go log(lo, s, LevelOutgoing)
 }
 
-func (lo *Logger) log(s string, i int) {
-	lo.mutex.Lock()
-	defer lo.mutex.Unlock()
-	message = lo.formatMessage(s, i)
-	lo.Output.Write([]byte(message))
+func log(lo *Logger, s string, i int) {
+	m := GetMutex(*lo)
+	m.Lock()
+	defer m.Unlock()
+	message := (*lo).formatMessage(s, i)
+	GetOutput(*lo).Write([]byte(message))
 }
 
 // Default message formatting for DefaultLogger
@@ -67,9 +72,22 @@ func (lo *DefaultLogger) formatMessage(s string, i int) string {
 	return s
 }
 
+func GetMutex(lp LoggerProvider) sync.Mutex {
+	return lp.GetLogger().mutex
+}
+
+func GetOutput(lp LoggerProvider) io.Writer {
+	return lp.GetLogger().Output
+}
+
 // Allow for creation your own loggers with custom formatting.
 // See PrettyLogger for how this is done.
 type Logger interface {
-	log(s string, i int)
 	formatMessage(s string, i int) string
+	GetLogger() *AnyLogger
+}
+
+// This interface is used to allow access to the struct fields.
+type LoggerProvider interface {
+	GetLogger() *AnyLogger
 }

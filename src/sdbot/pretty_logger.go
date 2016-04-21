@@ -3,28 +3,25 @@ package sdbot
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"log"
-	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	Reset   string = `\e[0m`
-	Bold    string = `\e[1m`
-	Red     string = `\e[31m`
-	Green   string = `\e[32m`
-	Yellow  string = `\e[33m`
-	Blue    string = `\e[34m`
-	Black   string = `\e[30m`
-	BgWhite string = `\e[47m`
+	Reset   string = "\x1b[0m"
+	Bold    string = "\x1b[1m"
+	Red     string = "\x1b[31m"
+	Green   string = "\x1b[32m"
+	Yellow  string = "\x1b[33m"
+	Blue    string = "\x1b[34m"
+	Black   string = "\x1b[30m"
+	BgWhite string = "\x1b[47m"
 )
 
 type PrettyLogger struct {
-	Output io.Writer
-	mutex  sync.Mutex
+	AnyLogger
 }
 
 func (lo *PrettyLogger) formatMessage(s string, level int) string {
@@ -47,19 +44,24 @@ func (lo *PrettyLogger) formatMessage(s string, level int) string {
 }
 
 func formatDebug(s string) string {
-	return fmt.Sprintf("%s %s %s", timestamp(), colourize("!!", Yellow), s)
+	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", Yellow), s)
 }
 
 func formatInfo(s string) string {
-	return fmt.Sprintf("%s %s %s", timestamp(), "II", s)
+	return fmt.Sprintf("%s %s %s\n", timestamp(), "II", s)
 }
 
 func formatError(s string) string {
-	return fmt.Sprintf("%s %s %s", timestamp(), colourize("red"), s)
+	debug.PrintStack()
+	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", Red), s)
+}
+
+func formatGeneral(s string) string {
+	return fmt.Sprintf("%s %s\n", timestamp(), s)
 }
 
 func formatIncoming(s string) string {
-	split := strings.Split(s, `\n`)
+	split := strings.Split(s, "\n")
 	if len(split) < 2 {
 		return formatGeneral(s)
 	}
@@ -71,24 +73,24 @@ func formatIncoming(s string) string {
 
 	if room == "" {
 		// Private messages
-		return fmt.Sprintf("%s %s %s|%s", timestamp(), prefix, colourize(parts[0], Blue), strings.Join(parts[1:], "|"))
+		return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, colourize(parts[0], Blue), strings.Join(parts[1:], "|"))
 	}
 
 	room = colourize(room[1:], Bold)
 
 	if len(parts) == 0 {
-		return fmt.Sprintf("%s %s %s", timestamp(), prefix, room)
+		return fmt.Sprintf("%s %s %s\n", timestamp(), prefix, room)
 	}
 
 	if len(parts) == 1 {
 		// Raw server messages
-		return fmt.Sprintf("%s %s %s|%s", timestamp(), prefix, room, colourize(parts[0], Red))
+		return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, room, colourize(parts[0], Red))
 	}
 
 	cmd := colourize(parts[1], Blue)
 	params := strings.Join(parts[2:], "|")
 
-	return fmt.Sprintf("%s %s %s|%s|%s", timestamps(), prefix, room, cmd, params)
+	return fmt.Sprintf("%s %s %s|%s|%s\n", timestamp(), prefix, room, cmd, params)
 }
 
 func formatOutgoing(s string) string {
@@ -97,33 +99,23 @@ func formatOutgoing(s string) string {
 	rest := split[1]
 	prefix := colourize("<<", Red)
 
-	return fmt.Sprintf("%s %s %s", timestamp(), colourize("!!", Red), s)
+	return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, room, rest)
 }
 
 func timestamp() string {
-	now := time.Now()
-	buffer := bytes.Buffer
-	buffer.WriteString("[")
-	buffer.WriteString(now.Date())
-	buffer.WriteString(" ")
-	buffer.WriteString(now.Clock())
-	buffer.WriteString("]")
-	return buffer.String()
+	return strings.Join([]string{"[", time.Now().Format(time.RFC1123), "]"}, "")
 }
 
 func colourize(s string, codes ...string) string {
-	reg, err := regexp.Compile(regexp.QuoteMeta(Reset))
-	if err != nil {
-		log.Fatal(formatError(s))
-	}
-
-	buffer := bytes.Buffer
+	var buffer bytes.Buffer
 	for _, code := range codes {
 		buffer.WriteString(code)
 	}
 	codeStr := buffer.String()
 
-	text := reg.ReplaceAllString(s, strings.Join([]string{Reset, codeStr}, ""))
+	return strings.Join([]string{codeStr, s, Reset}, "")
+}
 
-	return strings.Join([]string{codeStr, text, Reset}, "")
+func (lo *PrettyLogger) Mutex() sync.Mutex {
+	return lo.mutex
 }

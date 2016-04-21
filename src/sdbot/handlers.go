@@ -2,15 +2,34 @@ package sdbot
 
 import (
 	"errors"
-	"log"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
 )
 
-func Call(m map[string]interface{}, name string, params ...interface{}) (result []reflect.Value, err error) {
+// Define function handlers to call depending on the command we get.
+var Handlers = map[string]interface{}{
+	"challstr":   onChallstr,
+	"updateuser": onUpdateuser,
+	"l":          onLeave,
+	"j":          onJoin,
+	"n":          onNick,
+	"init":       onInit,
+	"deinit":     onDeinit,
+	"users":      onUsers,
+	"popup":      onPopup,
+	"c:":         onChat,
+	"pm":         onPrivateMessage,
+	"tournament": onTournament,
+}
+
+func CallHandler(m map[string]interface{}, name string, params ...interface{}) (result []reflect.Value, err error) {
 	f := reflect.ValueOf(m[name])
+	if !f.IsValid() {
+		return
+	}
+
 	if len(params) != f.Type().NumIn() {
 		err = errors.New("The number of params is not adapted.")
 		return
@@ -24,7 +43,7 @@ func Call(m map[string]interface{}, name string, params ...interface{}) (result 
 }
 
 func onChallstr(msg *Message, events chan string) {
-	log.Println("Attempting to log in...")
+	Info(&Log, "Attempting to log in...")
 	msg.Bot.Login(msg)
 }
 
@@ -37,9 +56,9 @@ func onUpdateuser(msg *Message, events chan string) {
 		AvatarSet = true
 	case "1":
 		for _, r := range msg.Bot.Config.Rooms {
-			room := Room{Name: strings.ToLower(r)}
+			room := &Room{Name: strings.ToLower(r)}
 			msg.Bot.RoomList[room] = true
-			msg.Bot.JoinRoom(&room)
+			msg.Bot.JoinRoom(room)
 		}
 	}
 }
@@ -47,7 +66,7 @@ func onUpdateuser(msg *Message, events chan string) {
 func onLeave(msg *Message, events chan string) {
 	// TODO Add Room logic
 	if msg.User.Name == msg.Bot.Nick {
-		delete(msg.Bot.Rooms, *msg.Room)
+		delete(msg.Bot.Rooms, msg.Room)
 	}
 }
 
@@ -64,8 +83,8 @@ func onNick(msg *Message, events chan string) {
 	if oldNick == Sanitize(msg.Bot.Nick) {
 		msg.Bot.Nick = msg.User.Name
 	} else {
-		msg.Bot.UserList[User{Name: oldNick}] = false
-		msg.Bot.UserList[User{Name: Sanitize(msg.User.Name)}] = true
+		delete(msg.Bot.UserList, &User{Name: oldNick})
+		msg.Bot.UserList[&User{Name: Sanitize(msg.User.Name)}] = true
 	}
 }
 
@@ -98,7 +117,7 @@ func includes(a []string, s string) bool {
 
 func onDeinit(msg *Message, events chan string) {
 	// TODO Add room logic
-	msg.Bot.Rooms[*msg.Room] = false
+	msg.Bot.Rooms[msg.Room] = false
 }
 
 func onUsers(msg *Message, events chan string) {
@@ -110,7 +129,7 @@ func onPopup(msg *Message, events chan string) {
 	if strings.Contains(msg.Params[2], "has banned you from the room") {
 		reg, err := regexp.Compile("(?P<user>[^ ]+) has banned you from the room (?P<room>[^ ]*).</p><p>To appeal")
 		if err != nil {
-			log.Fatal(err)
+			Error(&Log, err)
 		}
 		match := reg.FindStringSubmatch(msg.Params[2])
 		result := make(map[string]string)
@@ -120,7 +139,7 @@ func onPopup(msg *Message, events chan string) {
 			}
 		}
 		user, room := result["user"], result["room"]
-		log.Println("You have been banned from the room " + room + " by the user " + user)
+		Warn(&Log, "You have been banned from the room "+room+" by the user "+user)
 		// TODO: This is a lazy solution, but the server no longer notifies you when
 		// you are unbanned. Try to rejoin after a potential kick.
 		time.Sleep(time.Second)
