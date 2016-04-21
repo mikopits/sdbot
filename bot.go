@@ -15,22 +15,28 @@ const (
 
 type Bot struct {
 	Config     *Config
-	Connection *Connection   // The websocket connection
-	UserList   map[User]bool // List of all users the bot knows about
-	RoomList   map[Room]bool // List of all rooms the bot knows about
-	Rooms      map[Room]bool // List of all the rooms the bot is in
-	Nick       string        // The bot's username
+	Connection *Connection    // The websocket connection
+	Loggers    *Logger        // The logger used to debug TODO: list of loggers
+	UserList   *map[User]bool // List of all users the bot knows about
+	RoomList   *map[Room]bool // List of all rooms the bot knows about
+	Rooms      *map[Room]bool // List of all the rooms the bot is in
+	Nick       string         // The bot's username
 }
 
 // Creates a new bot instance.
 func NewBot() *Bot {
 	b := &Bot{
 		Config:   ReadConfig(),
-		UserList: make(map[User]bool),
-		RoomList: make(map[Room]bool),
+		UserList: &make(map[User]bool),
+		RoomList: &make(map[Room]bool),
 	}
 	b.Nick = b.Config.Nick
-	b.Connection = NewConnection(b)
+	b.Connection = &make(Connection{
+		Bot:       b,
+		Connected: false,
+		inQueue:   make(chan string, 128),
+		outQueue:  make(chan string, 128),
+	})
 	return b
 }
 

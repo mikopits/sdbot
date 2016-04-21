@@ -50,14 +50,14 @@ type Connection struct {
 	outQueue  chan string
 }
 
-func NewConnection(bot *Bot) *Connection {
-	return &Connection{
-		Bot:       bot,
-		Connected: false,
-		inQueue:   make(chan string, 128),
-		outQueue:  make(chan string, 128),
-	}
-}
+//func NewConnection(bot *Bot) *Connection {
+//	return &Connection{
+//		Bot:       bot,
+//		Connected: false,
+//		inQueue:   make(chan string, 128),
+//		outQueue:  make(chan string, 128),
+//	}
+//}
 
 // Connect to the server websocket and initialize reading and writing threads.
 func (c *Connection) Connect() {
