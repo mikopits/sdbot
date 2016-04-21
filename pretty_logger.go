@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -52,6 +51,7 @@ func formatInfo(s string) string {
 }
 
 func formatError(s string) string {
+	// TODO: Make the stack trace output readable
 	debug.PrintStack()
 	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", Red), s)
 }
@@ -114,8 +114,4 @@ func colourize(s string, codes ...string) string {
 	codeStr := buffer.String()
 
 	return strings.Join([]string{codeStr, s, Reset}, "")
-}
-
-func (lo *PrettyLogger) Mutex() sync.Mutex {
-	return lo.mutex
 }

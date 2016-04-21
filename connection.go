@@ -97,8 +97,8 @@ func (c *Connection) startReadingThread() {
 			select {
 			case event := <-c.inQueue:
 				var room string
-
 				messages := strings.Split(event, `\n`)
+
 				if string([]rune(messages[0])[0]) == ">" {
 					room, messages = messages[0], messages[1:]
 				}
