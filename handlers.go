@@ -148,19 +148,19 @@ func onPopup(msg *Message, events chan string) {
 }
 
 func onChat(msg *Message, events chan string) {
+	Debug(&Log, "in onChat")
 	if LoginTime == 0 {
 		return
 	}
 	if msg.Message != "" && msg.Timestamp >= LoginTime {
 		events <- "message"
+		ChatEvents <- msg
 	}
 }
 
 func onPrivateMessage(msg *Message, events chan string) {
 	events <- "private"
-	if msg.Message != "" {
-		events <- "message"
-	}
+	PrivateEvents <- msg
 }
 
 func onTournament(msg *Message, events chan string) {

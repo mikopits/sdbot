@@ -16,21 +16,25 @@ const (
 var Log Logger
 
 type Bot struct {
-	Config     *Config
-	Connection *Connection    // The websocket connection
-	UserList   map[*User]bool // List of all users the bot knows about
-	RoomList   map[*Room]bool // List of all rooms the bot knows about
-	Rooms      map[*Room]bool // List of all the rooms the bot is in
-	Nick       string         // The bot's username
+	Config       *Config
+	Connection   *Connection    // The websocket connection
+	UserList     map[*User]bool // List of all users the bot knows about
+	RoomList     map[*Room]bool // List of all rooms the bot knows about
+	Rooms        map[*Room]bool // List of all the rooms the bot is in
+	Nick         string         // The bot's username
+	Plugins      []*Plugin      // List of all registered plugins
+	TimedPlugins []*TimedPlugin // List of all registered timed plugins
 }
 
 // Creates a new bot instance.
 func NewBot() *Bot {
 	b := &Bot{
-		Config:   ReadConfig(),
-		UserList: make(map[*User]bool),
-		RoomList: make(map[*Room]bool),
-		Rooms:    make(map[*Room]bool),
+		Config:       ReadConfig(),
+		UserList:     make(map[*User]bool),
+		RoomList:     make(map[*Room]bool),
+		Rooms:        make(map[*Room]bool),
+		Plugins:      []*Plugin{},
+		TimedPlugins: []*TimedPlugin{},
 	}
 	b.Nick = b.Config.Nick
 	b.Connection = &Connection{
@@ -103,4 +107,69 @@ func (b *Bot) LeaveRoom(room *Room) {
 	delete(b.Rooms, room)
 	b.RoomList[room] = true
 	b.Connection.QueueMessage("|/leave " + room.Name)
+}
+
+// Register a plugin
+// Return false if the plugin has already been registered.
+// Return true if the plugin is successfully registered.
+func (b *Bot) RegisterPlugin(p *Plugin) bool {
+	for _, plugin := range b.Plugins {
+		if plugin == p {
+			return false
+		}
+	}
+	p.Listen()
+	b.Plugins = append(b.Plugins, p)
+	return true
+}
+
+// Register a timed plugin
+// Return false if the plugin has already been registered.
+// Return true if the plugin is successfully registered.
+func (b *Bot) RegisterTimedPlugin(tp *TimedPlugin) bool {
+	for _, plugin := range b.TimedPlugins {
+		if plugin == tp {
+			return false
+		}
+	}
+	b.TimedPlugins = append(b.TimedPlugins, tp)
+	return true
+}
+
+// Unregister a plugin.
+// Returns true if the plugin was successfully unregistered.
+func (b *Bot) UnregisterPlugin(p *Plugin) bool {
+	for i, plugin := range b.Plugins {
+		if plugin == p {
+			b.Plugins = append(b.Plugins[:i], b.Plugins[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// Unregister a timed plugin.
+// Returns true if the plugins was successfully unregistered.
+func (b *Bot) UnregisterTimedPlugin(tp *TimedPlugin) bool {
+	for i, plugin := range b.TimedPlugins {
+		if plugin == tp {
+			b.TimedPlugins = append(b.TimedPlugins[:i], b.TimedPlugins[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// Start all registered TimedPlugins
+func (b *Bot) StartTimedPlugins() {
+	for _, tp := range b.TimedPlugins {
+		tp.TimedEventHandler.Start()
+	}
+}
+
+// Stop all registered TimedPlugins
+func (b *Bot) StopTimedPlugins() {
+	for _, tp := range b.TimedPlugins {
+		tp.TimedEventHandler.Stop()
+	}
 }

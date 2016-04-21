@@ -3,7 +3,7 @@ package sdbot
 import (
 	"bytes"
 	"fmt"
-	"runtime/debug"
+	//"runtime/debug"
 	"strings"
 	"time"
 )
@@ -51,8 +51,8 @@ func formatInfo(s string) string {
 }
 
 func formatError(s string) string {
-	// TODO: Make the stack trace output readable
-	debug.PrintStack()
+	//debug.SetTraceback("single")
+	//debug.PrintStack()
 	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", Red), s)
 }
 
@@ -73,6 +73,7 @@ func formatIncoming(s string) string {
 
 	if room == "" {
 		// Private messages
+		parts = parts[1:]
 		return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, colourize(parts[0], Blue), strings.Join(parts[1:], "|"))
 	}
 
@@ -103,7 +104,7 @@ func formatOutgoing(s string) string {
 }
 
 func timestamp() string {
-	return strings.Join([]string{"[", time.Now().Format(time.RFC1123), "]"}, "")
+	return strings.Join([]string{"[", time.Now().Format(time.RFC3339), "]"}, "")
 }
 
 func colourize(s string, codes ...string) string {

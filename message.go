@@ -8,7 +8,6 @@ import (
 
 type Message struct {
 	Bot       *Bot
-	Raw       string
 	Time      time.Time
 	Command   string
 	Params    []string
@@ -23,7 +22,6 @@ type Message struct {
 func NewMessage(rawMessage string, bot *Bot) *Message {
 	m := &Message{
 		Bot:  bot,
-		Raw:  rawMessage,
 		Time: time.Now(),
 	}
 	m.Command, m.Params, m.Timestamp, m.Room, m.User, m.Auth, m.Target, m.Message = parseMessage(rawMessage, bot)
@@ -45,7 +43,7 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 
 	// The command is always after the first vertical bar.
 	if len(vertbarDelimited) < 2 {
-		command = ""
+		command = "none"
 	} else {
 		command = string(vertbarDelimited[1])
 	}
@@ -82,23 +80,40 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 		auth = string(vertbarDelimited[3][0])
 		user = &User{Name: string(vertbarDelimited[3][1:])}
 		b.UserList[user] = true
-	case "c", "j", "l", "n", "pm":
+	case "c":
+		fallthrough
+	case "j":
+		fallthrough
+	case "l":
+		fallthrough
+	case "n":
+		fallthrough
+	case "pm":
 		auth = string(vertbarDelimited[2][0])
 		user = &User{Name: string(vertbarDelimited[2][1:])}
 		b.UserList[user] = true
-	default:
-		auth = ""
-		user = &User{}
+	}
+
+	// Parse the message
+	if command == "" {
+		message = ""
+	} else {
+		switch strings.ToLower(command) {
+		case "c:", "pm":
+			message = strings.Join(vertbarDelimited[4:], "|")
+		case "none":
+			message = newlineDelimited[len(newlineDelimited)-1]
+		}
 	}
 
 	// Decide the target
 	if strings.ToLower(command) == "pm" {
 		return command, params, timestamp, room, user, auth, user, message
 	}
-
 	return command, params, timestamp, room, user, auth, room, message
 }
 
-func (m *Message) Reply(res string, bot *Bot) {
-	m.Target.Reply(res, m, bot)
+// Reply to a message
+func (m *Message) Reply(res string) {
+	m.Target.Reply(res, m, m.Bot)
 }

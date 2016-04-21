@@ -36,6 +36,7 @@ func ReadConfig() *Config {
 	}
 
 	config.generatePluginPrefixRegexp()
+
 	return &config
 }
 

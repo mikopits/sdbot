@@ -21,9 +21,7 @@ var PingTicker *time.Ticker
 
 var interrupt chan os.Signal
 
-// ErrUnexpectedMessageType is returned when we receive a message from the
-// websocket that isn't a websocket.TextMessage or websocket.CloseNormalClosure.
-var ErrUnexpectedMessageType = errors.New("sdbot: unexpected message type from the websocket")
+var events = make(chan string, 64)
 
 type Connection struct {
 	Bot       *Bot
@@ -70,6 +68,10 @@ func (c *Connection) Connect() {
 	wg.Wait()
 }
 
+// ErrUnexpectedMessageType is returned when we receive a message from the
+// websocket that isn't a websocket.TextMessage or websocket.CloseNormalClosure.
+var ErrUnexpectedMessageType = errors.New("sdbot: unexpected message type from the websocket")
+
 func (c *Connection) startReadingThread() {
 	// Listen for messages from the websocket
 	go func() error {
@@ -79,13 +81,14 @@ func (c *Connection) startReadingThread() {
 				Error(&Log, err)
 			}
 
-			if msgType != websocket.TextMessage || msgType != websocket.CloseNormalClosure {
+			if msgType != websocket.TextMessage {
 				err = ErrUnexpectedMessageType
 				Error(&Log, err)
 				return err
 			}
 
 			Incoming(&Log, string(msg))
+
 			c.inQueue <- string(msg)
 		}
 		return nil
@@ -104,7 +107,7 @@ func (c *Connection) startReadingThread() {
 				}
 
 				for _, rawMessage := range messages {
-					parse(strings.Join([]string{room, `\n`, rawMessage}, ""), c.Bot)
+					go parse(strings.Join([]string{room, rawMessage}, `\n`), c.Bot)
 				}
 			case <-interrupt:
 				return
@@ -170,8 +173,8 @@ func parse(s string, b *Bot) {
 	}
 
 	msg := NewMessage(s, b)
+	Debug(&Log, fmt.Sprintf("message=[%+v]", msg))
 	cmd := strings.ToLower(msg.Command)
-	events := make(chan string, 64)
 
 	switch cmd {
 	case ":":
@@ -184,5 +187,6 @@ func parse(s string, b *Bot) {
 	}
 
 	events <- cmd
+
 	CallHandler(Handlers, cmd, msg, events)
 }
