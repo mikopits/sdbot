@@ -163,19 +163,16 @@ func (p *Plugin) Listen() {
 		for {
 			select {
 			case m := <-*p.Bot.PluginChatChannels[p.Name]:
-				//Debug(&Log, fmt.Sprintf("[message=%+v]", m))
 				match, prefix, args, rest := p.Match(m)
-				//Debug(&Log, fmt.Sprintf("[match=%t] [prefix=%s] [args=%s] [rest=%s]", match, prefix, args, rest))
 				if match {
-					Debug(&Log, fmt.Sprintf("Matched on [prefix=%s] [args=%s] [rest=%s]"))
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s`", p.Name))
 					go p.EventHandler.HandleChatEvents(m, prefix, args, rest)
 				}
 			case m := <-*p.Bot.PluginPrivateChannels[p.Name]:
-				Debug(&Log, fmt.Sprintf("[message=%+v]", m))
+				Debug(&Log, fmt.Sprintf("[user=%+v]", m.User))
 				match, prefix, args, rest := p.Match(m)
-				//Debug(&Log, fmt.Sprintf("[match=%t] [prefix=%s] [args=%s] [rest=%s]", match, prefix, args, rest))
 				if match {
-					Debug(&Log, fmt.Sprintf("Matched on [prefix=%s] [args=%s] [rest=%s]"))
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s`", p.Name))
 					go p.EventHandler.HandlePrivateEvents(m, prefix, args, rest)
 				}
 			}

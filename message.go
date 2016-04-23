@@ -125,7 +125,11 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 
 // Reply to a message
 func (m *Message) Reply(res string) {
-	m.Target.Reply(res, m, m.Bot)
+	m.Target.Reply(m, res)
+}
+
+func (m *Message) RawReply(res string) {
+	m.Target.RawReply(m, res)
 }
 
 // Add matches to the message and return true if there was no previous match

@@ -124,7 +124,7 @@ func onUsers(msg *Message, events chan string) {
 	for _, user := range strings.Split(msg.Params[0], ",")[1:] {
 		auth, nick := string(user[0]), user[1:]
 		FindRoomEnsured(msg.Room.Name, msg.Bot).AddUser(nick)
-		FindUserEnsured(user, msg.Bot).AddAuth(msg.Room.Name, auth)
+		FindUserEnsured(nick, msg.Bot).AddAuth(msg.Room.Name, auth)
 	}
 }
 

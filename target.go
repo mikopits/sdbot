@@ -35,23 +35,23 @@ func NewUser(name string) *User {
 }
 
 // Responds to a user in private message.
-func (u *User) Reply(res string, msg *Message, bot *Bot) {
-	bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,(%s) %s", u.Name, msg.User.Name, res))
+func (u *User) Reply(m *Message, res string) {
+	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,(%s) %s", u.Name, m.User.Name, res))
 }
 
 // Responds to a user in a room.
-func (r *Room) Reply(res string, msg *Message, bot *Bot) {
-	bot.Connection.QueueMessage(fmt.Sprintf("%s|(%s) %s", r.Name, msg.User.Name, res))
+func (r *Room) Reply(m *Message, res string) {
+	m.Bot.Connection.QueueMessage(fmt.Sprintf("%s|(%s) %s", r.Name, m.User.Name, res))
 }
 
 // Responds to a user in private message without prepending their username.
-func (u *User) RawReply(res string, msg *Message, bot *Bot) {
-	bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,%s", u.Name, res))
+func (u *User) RawReply(m *Message, res string) {
+	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,%s", u.Name, res))
 }
 
 // Responds to a user in a room without prepending their username.
-func (r *Room) RawReply(res string, msg *Message, bot *Bot) {
-	bot.Connection.QueueMessage(fmt.Sprintf("%s|%s", r.Name, res))
+func (r *Room) RawReply(m *Message, res string) {
+	m.Bot.Connection.QueueMessage(fmt.Sprintf("%s|%s", r.Name, res))
 }
 
 // Add a room authority to the user.
@@ -139,5 +139,6 @@ func Rename(old string, s string, bot *Bot) {
 // A Target can be either a Room or a User. It represents where the bot will
 // send its message in response.
 type Target interface {
-	Reply(string, *Message, *Bot)
+	Reply(*Message, string)
+	RawReply(*Message, string)
 }

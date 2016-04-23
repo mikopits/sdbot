@@ -1,0 +1,28 @@
+# The server you want to the bot to join.
+# The main server is "sim.smogon.com"
+Server = "sim.smogon.com"
+
+# The port over which you want to connect to the websocket.
+Port = "8000"
+
+# The username your bot will use. Recommended to use a name you've registered.
+Nick = ""
+
+# The password for the above registered username.
+# Leave it blank ("") if you are using an unregistered name.
+Password = ""
+
+# The rate at which the bot will send messages at. Recommended value is 3.
+MessagesPerSecond = 3.0
+
+# The rooms the bot will automatically join.
+# Keep in mind that bots are not allowed in the lobby.
+Rooms = ["showderp"]
+
+# The avatar you want the bot use.
+# Set to "0" to get a default avatar.
+# Anything from "1" to "294" works.
+Avatar = "0"
+
+# The prefixes you want the bot to trigger commands on by default.
+PluginPrefixes = ["."]
