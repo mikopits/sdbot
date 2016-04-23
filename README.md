@@ -27,17 +27,23 @@ git clone http://github.com/mikopits/sdbot
 Example
 -------
 
-To get the bare bones bot up and running:
+To get the bot up and running and with a loaded example plugin:
 
 ```go
 package main
 
-import "github.com/mikopits/sdbot"
+import (
+  "github.com/mikopits/sdbot"
+  "github.com/mikopits/sdbot/examples/plugins"
+)
 
 func main() {
-  bot := sdbot.NewBot()
+  b := sdbot.NewBot()
+  p := plugins.HelloWorldPlugin(b)
+  b.RegisterPlugin(p, "hello world")
   bot.Connection.Connect()
 }
 ```
 
-And be sure to set your config.toml file.
+And be sure to set your `config.toml` file in the same directory as
+`package main`.
