@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,6 +25,7 @@ var Handlers = map[string]interface{}{
 	"tournament": onTournament,
 }
 
+// Uses reflection to call a handler if it exists for the given command
 func CallHandler(m map[string]interface{}, name string, params ...interface{}) (result []reflect.Value, err error) {
 	f := reflect.ValueOf(m[name])
 	if !f.IsValid() {
@@ -52,39 +54,37 @@ var AvatarSet bool = false
 func onUpdateuser(msg *Message, events chan string) {
 	switch msg.Params[1] {
 	case "0":
-		msg.Bot.Connection.QueueMessage("|/avatar " + msg.Bot.Config.Avatar)
-		AvatarSet = true
+		if msg.Bot.Config.Avatar > 0 && msg.Bot.Config.Avatar <= 294 {
+			msg.Bot.Connection.QueueMessage("|/avatar " + strconv.Itoa(msg.Bot.Config.Avatar))
+			AvatarSet = true
+		}
 	case "1":
 		for _, r := range msg.Bot.Config.Rooms {
-			room := &Room{Name: strings.ToLower(r)}
-			msg.Bot.RoomList[room] = true
+			room := FindRoomEnsured(r, msg.Bot)
 			msg.Bot.JoinRoom(room)
 		}
 	}
 }
 
 func onLeave(msg *Message, events chan string) {
-	// TODO Add Room logic
-	if msg.User.Name == msg.Bot.Nick {
-		delete(msg.Bot.Rooms, msg.Room)
-	}
+	delete(msg.Bot.UserList, Sanitize(msg.User.Name))
 }
 
 func onJoin(msg *Message, events chan string) {
-	// TODO Add Room logic
 	if msg.User.Name == msg.Bot.Nick {
 		onInit(msg, events)
 	}
+
+	FindUserEnsured(msg.User.Name, msg.Bot).AddAuth(msg.Room.Name, msg.Auth)
+	FindRoomEnsured(msg.Room.Name, msg.Bot).AddUser(msg.User.Name)
 }
 
 func onNick(msg *Message, events chan string) {
-	// TODO Add Room logic
 	oldNick := Sanitize(msg.Params[0])
 	if oldNick == Sanitize(msg.Bot.Nick) {
 		msg.Bot.Nick = msg.User.Name
 	} else {
-		delete(msg.Bot.UserList, &User{Name: oldNick})
-		msg.Bot.UserList[&User{Name: Sanitize(msg.User.Name)}] = true
+		Rename(oldNick, msg.User.Name, msg.Bot)
 	}
 }
 
@@ -96,12 +96,12 @@ func onInit(msg *Message, events chan string) {
 	// Note that a successful /join will trigger another init event.
 	// So be careful to not cause an infinite loop.
 	if !includes(msg.Bot.Config.Rooms, msg.Room.Name) {
-		msg.Bot.LeaveRoom(msg.Room)
+		msg.Bot.LeaveRoom(FindRoomEnsured(msg.Room.Name, msg.Bot))
 		// Try to join each of the config rooms, as you may have been redirected.
 		// It is safe to call "/join [room]" if you are already in it, so there is
 		// not really a need to check.
 		for _, room := range msg.Bot.Config.Rooms {
-			msg.Bot.JoinRoom(&Room{Name: room})
+			msg.Bot.JoinRoom(FindRoomEnsured(room, msg.Bot))
 		}
 	}
 }
@@ -116,12 +116,16 @@ func includes(a []string, s string) bool {
 }
 
 func onDeinit(msg *Message, events chan string) {
-	// TODO Add room logic
-	msg.Bot.Rooms[msg.Room] = false
+	// TODO Attempt to rejoin? Does the state need to be updated?
 }
 
 func onUsers(msg *Message, events chan string) {
-	// TODO Populate the room with its users and their auth levels
+	// Populate the room with its users and their auth levels.
+	for _, user := range strings.Split(msg.Params[0], ",")[1:] {
+		auth, nick := string(user[0]), user[1:]
+		FindRoomEnsured(msg.Room.Name, msg.Bot).AddUser(nick)
+		FindUserEnsured(user, msg.Bot).AddAuth(msg.Room.Name, auth)
+	}
 }
 
 func onPopup(msg *Message, events chan string) {
@@ -148,27 +152,34 @@ func onPopup(msg *Message, events chan string) {
 }
 
 func onChat(msg *Message, events chan string) {
-	Debug(&Log, "in onChat")
 	if LoginTime == 0 {
 		return
 	}
 	if msg.Message != "" && msg.Timestamp >= LoginTime {
 		events <- "message"
-		ChatEvents <- msg
+		for _, channel := range msg.Bot.PluginChatChannels {
+			*channel <- msg
+		}
 	}
 }
 
 func onPrivateMessage(msg *Message, events chan string) {
 	events <- "private"
-	PrivateEvents <- msg
+	for _, channel := range msg.Bot.PluginPrivateChannels {
+		*channel <- msg
+	}
 }
 
 func onTournament(msg *Message, events chan string) {
-	param := msg.Params[0]
 	// Tournaments are very noisy and send a lot of information we don't need,
 	// only want to listen to tournament create, update, and start events. You
 	// can still use the "tournament" event for other purposes.
-	if param == "create" || param == "update" || param == "start" {
+	switch msg.Params[0] {
+	case "create":
+		fallthrough
+	case "update":
+		fallthrough
+	case "start":
 		events <- "tour"
 	}
 }

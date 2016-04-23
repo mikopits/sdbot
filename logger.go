@@ -31,40 +31,40 @@ type DefaultLogger struct {
 
 // Log debug messages at different levels of severity.
 func Debug(lo *Logger, s string) {
-	go log(lo, s, LevelDebug)
+	log(lo, s, LevelDebug)
 }
 
 func Info(lo *Logger, s string) {
-	go log(lo, s, LevelInfo)
+	log(lo, s, LevelInfo)
 }
 
 func Warn(lo *Logger, s string) {
-	go log(lo, s, LevelWarn)
+	log(lo, s, LevelWarn)
 }
 
 func Error(lo *Logger, e error) {
-	go log(lo, e.Error(), LevelError)
+	log(lo, e.Error(), LevelError)
 }
 
 func Fatal(lo *Logger, s string) {
-	go log(lo, s, LevelFatal)
+	log(lo, s, LevelFatal)
 }
 
 // Log messages sent to and from the websocket.
 func Incoming(lo *Logger, s string) {
-	go log(lo, s, LevelIncoming)
+	log(lo, s, LevelIncoming)
 }
 
 func Outgoing(lo *Logger, s string) {
-	go log(lo, s, LevelOutgoing)
+	log(lo, s, LevelOutgoing)
 }
 
 func log(lo *Logger, s string, i int) {
 	m := GetMutex(*lo)
 	m.Lock()
-	defer m.Unlock()
 	message := (*lo).formatMessage(s, i)
 	GetOutput(*lo).Write([]byte(message))
+	m.Unlock()
 }
 
 // Default message formatting for DefaultLogger

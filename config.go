@@ -17,7 +17,7 @@ type Config struct {
 	Password          string
 	MessagesPerSecond float64
 	Rooms             []string
-	Avatar            string
+	Avatar            int
 	PluginPrefixes    []string
 	PluginPrefix      *regexp.Regexp
 }

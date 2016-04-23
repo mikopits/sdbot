@@ -8,16 +8,87 @@ import (
 	"time"
 )
 
-var ChatEvents = make(chan *Message, 64)
-var PrivateEvents = make(chan *Message, 64)
-
+// TODO Add a Killable struct to add functionality to break out of the
+// Plugin.Listen loop.
 type Plugin struct {
 	Bot          *Bot
-	Prefixes     []string // The prefixes you want the plugin to fire on
-	Command      string   // The command you want the plugin to fire on
-	NumArgs      int      // Number of comma separated arguments you expect for your plugin.
-	Cooldown     int      // Number of seconds before the command can be used again. No cooldown if <= 0.
+	Name         string
+	Prefixes     []string
+	Command      string
+	NumArgs      int
+	Cooldown     int
+	LastUsed     time.Time
 	EventHandler EventHandler
+}
+
+// Define different convenient ways to make new Plugin structs. You must add
+// the bot and event handlers after creation with these methods.
+func NewPlugin(b *Bot, cmd string, prefixes ...string) *Plugin {
+	var p []string
+	if prefixes != nil {
+		p = prefixes
+	} else {
+		p = b.Config.PluginPrefixes
+	}
+
+	return &Plugin{
+		Bot:      b,
+		Command:  cmd,
+		Prefixes: p,
+	}
+}
+
+func NewPluginWithArgs(b *Bot, cmd string, numArgs int, prefixes ...string) *Plugin {
+	var p []string
+	if prefixes != nil {
+		p = prefixes
+	} else {
+		p = b.Config.PluginPrefixes
+	}
+
+	return &Plugin{
+		Bot:      b,
+		Command:  cmd,
+		NumArgs:  numArgs,
+		Prefixes: p,
+	}
+}
+
+func NewPluginWithCooldown(b *Bot, cmd string, cooldown int, prefixes ...string) *Plugin {
+	var p []string
+	if prefixes != nil {
+		p = prefixes
+	} else {
+		p = b.Config.PluginPrefixes
+	}
+
+	return &Plugin{
+		Bot:      b,
+		Command:  cmd,
+		Cooldown: cooldown,
+		Prefixes: p,
+	}
+}
+
+func NewPluginWithArgsAndCooldown(b *Bot, cmd string, numArgs int, cooldown int, prefixes ...string) *Plugin {
+	var p []string
+	if prefixes != nil {
+		p = prefixes
+	} else {
+		p = b.Config.PluginPrefixes
+	}
+
+	return &Plugin{
+		Bot:      b,
+		Command:  cmd,
+		NumArgs:  numArgs,
+		Cooldown: cooldown,
+		Prefixes: p,
+	}
+}
+
+func (p *Plugin) SetEventHandler(eh EventHandler) {
+	p.EventHandler = eh
 }
 
 type TimedPlugin struct {
@@ -86,23 +157,26 @@ func (p *Plugin) Match(m *Message) (bool, string, []string, string) {
 	return true, match, args, strings.TrimSpace(rest.String())
 }
 
+// Starts a loop in its own goroutine looking for events.
 func (p *Plugin) Listen() {
 	go func() {
 		for {
 			select {
-			case m := <-ChatEvents:
-				Debug(&Log, "Got chat event")
+			case m := <-*p.Bot.PluginChatChannels[p.Name]:
+				//Debug(&Log, fmt.Sprintf("[message=%+v]", m))
 				match, prefix, args, rest := p.Match(m)
+				//Debug(&Log, fmt.Sprintf("[match=%t] [prefix=%s] [args=%s] [rest=%s]", match, prefix, args, rest))
 				if match {
 					Debug(&Log, fmt.Sprintf("Matched on [prefix=%s] [args=%s] [rest=%s]"))
-					p.EventHandler.HandleChatEvents(m, prefix, args, rest)
+					go p.EventHandler.HandleChatEvents(m, prefix, args, rest)
 				}
-			case m := <-PrivateEvents:
-				Debug(&Log, "Got pm event")
+			case m := <-*p.Bot.PluginPrivateChannels[p.Name]:
+				//Debug(&Log, fmt.Sprintf("[message=%+v]", m))
 				match, prefix, args, rest := p.Match(m)
+				//Debug(&Log, fmt.Sprintf("[match=%t] [prefix=%s] [args=%s] [rest=%s]", match, prefix, args, rest))
 				if match {
 					Debug(&Log, fmt.Sprintf("Matched on [prefix=%s] [args=%s] [rest=%s]"))
-					p.EventHandler.HandlePrivateEvents(m, prefix, args, rest)
+					go p.EventHandler.HandlePrivateEvents(m, prefix, args, rest)
 				}
 			}
 		}

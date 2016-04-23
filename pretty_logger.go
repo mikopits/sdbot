@@ -112,7 +112,6 @@ func colourize(s string, codes ...string) string {
 	for _, code := range codes {
 		buffer.WriteString(code)
 	}
-	codeStr := buffer.String()
 
-	return strings.Join([]string{codeStr, s, Reset}, "")
+	return strings.Join([]string{buffer.String(), s, Reset}, "")
 }

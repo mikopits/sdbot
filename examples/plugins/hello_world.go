@@ -2,21 +2,33 @@ package plugins
 
 import (
 	"sdbot"
-	"time"
 )
 
-var HelloWorldPlugin = &sdbot.Plugin{
-	Command:      "hi",
-	EventHandler: &HelloWorldEventHandler{},
+// We don't have the bot yet, so define a function literal that we can call at
+// a later time.
+var HelloWorldPlugin = func(b *sdbot.Bot) *sdbot.Plugin {
+	p := &sdbot.Plugin{
+		Bot:      b,
+		Prefixes: []string{},
+		Command:  "hi",
+		Cooldown: 5,
+		NumArgs:  0,
+	}
+	p.EventHandler = &HelloWorldEventHandler{Plugin: p}
+	return p
 }
 
 type HelloWorldEventHandler struct {
-	LastUsed time.Time
+	Plugin *sdbot.Plugin
 }
 
 func (eh *HelloWorldEventHandler) HandleChatEvents(m *sdbot.Message, prefix string, args []string, rest string) {
-	eh.LastUsed = time.Now() // Could keep track of cooldown with eh.LastUsed
-	m.Reply("hi :)")
+	if int(m.Time.Unix()-eh.Plugin.LastUsed.Unix()) < eh.Plugin.Cooldown {
+		m.Reply("cooldown not done")
+	} else {
+		m.Reply("hi :)")
+	}
+	eh.Plugin.LastUsed = m.Time
 }
 
 func (eh *HelloWorldEventHandler) HandlePrivateEvents(m *sdbot.Message, prefix string, args []string, rest string) {

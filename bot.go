@@ -2,11 +2,14 @@ package sdbot
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 )
 
 const (
@@ -15,34 +18,45 @@ const (
 
 var Log Logger
 
+// The Bot struct is the entrypoint to all the necessary behaviour of the bot.
+// The bot runs its handlers in separate goroutines, so an API is provided to
+// allow for thread-safe and concurrent access to the bot. See the Synchronize
+// method for how this works.
 type Bot struct {
-	Config       *Config
-	Connection   *Connection    // The websocket connection
-	UserList     map[*User]bool // List of all users the bot knows about
-	RoomList     map[*Room]bool // List of all rooms the bot knows about
-	Rooms        map[*Room]bool // List of all the rooms the bot is in
-	Nick         string         // The bot's username
-	Plugins      []*Plugin      // List of all registered plugins
-	TimedPlugins []*TimedPlugin // List of all registered timed plugins
+	Config                *Config
+	Connection            *Connection
+	UserList              map[string]*User
+	RoomList              map[string]*Room
+	Rooms                 []string
+	Nick                  string
+	Plugins               []*Plugin
+	TimedPlugins          []*TimedPlugin
+	PluginChatChannels    map[string]*chan *Message
+	PluginPrivateChannels map[string]*chan *Message
+	mutex                 sync.Mutex
+	semaphores            map[string]*sync.Mutex
+	Callback              *Callback
 }
 
 // Creates a new bot instance.
 func NewBot() *Bot {
 	b := &Bot{
-		Config:       ReadConfig(),
-		UserList:     make(map[*User]bool),
-		RoomList:     make(map[*Room]bool),
-		Rooms:        make(map[*Room]bool),
-		Plugins:      []*Plugin{},
-		TimedPlugins: []*TimedPlugin{},
+		Config:                ReadConfig(),
+		UserList:              make(map[string]*User),
+		RoomList:              make(map[string]*Room),
+		Plugins:               []*Plugin{},
+		TimedPlugins:          []*TimedPlugin{},
+		PluginChatChannels:    make(map[string]*chan *Message, 64),
+		PluginPrivateChannels: make(map[string]*chan *Message, 64),
+		semaphores:            make(map[string]*sync.Mutex),
 	}
 	b.Nick = b.Config.Nick
 	b.Connection = &Connection{
 		Bot:       b,
 		Connected: false,
-		inQueue:   make(chan string, 128),
-		outQueue:  make(chan string, 128),
+		outQueue:  make(chan string, 64),
 	}
+	b.Callback = &Callback{Bot: b}
 	Log = &PrettyLogger{AnyLogger{Output: os.Stderr}}
 	return b
 }
@@ -97,47 +111,80 @@ func (b *Bot) Login(msg *Message) {
 
 // Joins a room.
 func (b *Bot) JoinRoom(room *Room) {
-	b.Rooms[room] = true
-	b.RoomList[room] = true
+	b.Rooms = append(b.Rooms, room.Name)
+	if b.RoomList[room.Name] != nil {
+		b.RoomList[room.Name] = room
+	}
+
 	b.Connection.QueueMessage("|/join " + room.Name)
 }
 
 // Leaves a room.
 func (b *Bot) LeaveRoom(room *Room) {
-	delete(b.Rooms, room)
-	b.RoomList[room] = true
+	for i, r := range b.Rooms {
+		if room.Name == r {
+			b.Rooms = append(b.Rooms[:i], b.Rooms[i+1:]...)
+		}
+	}
+	delete(b.RoomList, room.Name)
+
 	b.Connection.QueueMessage("|/leave " + room.Name)
 }
 
-// Register a plugin
-// Return false if the plugin has already been registered.
-// Return true if the plugin is successfully registered.
-func (b *Bot) RegisterPlugin(p *Plugin) bool {
+var ErrPluginNameAlreadyRegistered = errors.New("sdbot: plugin name was already in use (register under another name)")
+var ErrPluginAlreadyRegistered = errors.New("sdbot: plugin was already registered")
+
+// Registers a plugin under a name and start listening on its event handler.
+func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 	for _, plugin := range b.Plugins {
 		if plugin == p {
-			return false
+			Error(&Log, ErrPluginAlreadyRegistered)
+			return ErrPluginAlreadyRegistered
 		}
 	}
-	p.Listen()
+
+	Debug(&Log, fmt.Sprintf("[on bot] Registering plugin `%s`", name))
+	if b.PluginChatChannels[name] != nil {
+		Error(&Log, ErrPluginNameAlreadyRegistered)
+		return ErrPluginNameAlreadyRegistered
+	} else {
+		p.Bot = b
+		p.Name = name
+
+		// Load prefixes from the config if none were provided.
+		if len(p.Prefixes) == 0 {
+			p.Prefixes = b.Config.PluginPrefixes
+		}
+
+		chatChannel := make(chan *Message, 64)
+		privateChannel := make(chan *Message, 64)
+		b.PluginChatChannels[name] = &chatChannel
+		b.PluginPrivateChannels[name] = &privateChannel
+	}
+
 	b.Plugins = append(b.Plugins, p)
-	return true
+	p.Listen()
+	return nil
 }
 
 // Register a timed plugin
 // Return false if the plugin has already been registered.
 // Return true if the plugin is successfully registered.
+// TODO update for new plugin structure
 func (b *Bot) RegisterTimedPlugin(tp *TimedPlugin) bool {
 	for _, plugin := range b.TimedPlugins {
 		if plugin == tp {
 			return false
 		}
 	}
+	tp.Bot = b
 	b.TimedPlugins = append(b.TimedPlugins, tp)
 	return true
 }
 
 // Unregister a plugin.
 // Returns true if the plugin was successfully unregistered.
+// TODO update for new plugin structure
 func (b *Bot) UnregisterPlugin(p *Plugin) bool {
 	for i, plugin := range b.Plugins {
 		if plugin == p {
@@ -150,6 +197,7 @@ func (b *Bot) UnregisterPlugin(p *Plugin) bool {
 
 // Unregister a timed plugin.
 // Returns true if the plugins was successfully unregistered.
+// TODO update for new plugin structure
 func (b *Bot) UnregisterTimedPlugin(tp *TimedPlugin) bool {
 	for i, plugin := range b.TimedPlugins {
 		if plugin == tp {
@@ -172,4 +220,21 @@ func (b *Bot) StopTimedPlugins() {
 	for _, tp := range b.TimedPlugins {
 		tp.TimedEventHandler.Stop()
 	}
+}
+
+// Provides an API to keep your code thread-safe and concurrent.
+// The name is an arbitrary name you can choose for your mutex. The lambda is
+// Then run in the mutex defined by the name. Choose unique names!
+func (b *Bot) Synchronize(name string, lambda *func() interface{}) interface{} {
+	b.mutex.Lock()
+	_, exists := b.semaphores[name]
+	if !exists {
+		b.semaphores[name] = &sync.Mutex{}
+	}
+	semaphore := b.semaphores[name]
+	b.mutex.Unlock()
+
+	semaphore.Lock()
+	defer semaphore.Unlock()
+	return (*lambda)()
 }

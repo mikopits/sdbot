@@ -1,6 +1,7 @@
 package sdbot
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,14 +18,17 @@ type Message struct {
 	Auth      string
 	Target    Target
 	Message   string
+	Matches   map[string]map[*regexp.Regexp][]string
 }
 
-func NewMessage(rawMessage string, bot *Bot) *Message {
+// Room name, other message content, bot
+func NewMessage(s string, bot *Bot) *Message {
 	m := &Message{
-		Bot:  bot,
-		Time: time.Now(),
+		Bot:     bot,
+		Time:    time.Now(),
+		Matches: make(map[string]map[*regexp.Regexp][]string),
 	}
-	m.Command, m.Params, m.Timestamp, m.Room, m.User, m.Auth, m.Target, m.Message = parseMessage(rawMessage, bot)
+	m.Command, m.Params, m.Timestamp, m.Room, m.User, m.Auth, m.Target, m.Message = parseMessage(s, bot)
 	return m
 }
 
@@ -33,6 +37,7 @@ func NewMessage(rawMessage string, bot *Bot) *Message {
 func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string, Target, string) {
 	newlineDelimited := strings.Split(s, "\n")
 	vertbarDelimited := strings.Split(s, "|")
+
 	var command string
 	var params []string
 	var timestamp int
@@ -52,7 +57,11 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	if command == "" {
 		params = []string{}
 	} else {
-		params = vertbarDelimited[2:]
+		if len(vertbarDelimited) > 2 {
+			params = vertbarDelimited[2:]
+		} else {
+			params = []string{}
+		}
 	}
 
 	// Parse the timestamp of a chat event.
@@ -67,19 +76,21 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	}
 
 	// If the message starts with a ">" then it comes from a room.
-	if string(newlineDelimited[0][0]) == ">" {
-		room = &Room{Name: string(newlineDelimited[0][1:])}
-		b.RoomList[room] = true
-	} else {
+	if newlineDelimited[0] == "" {
 		room = &Room{}
+	} else {
+		if string(newlineDelimited[0][0]) == ">" {
+			room = FindRoomEnsured(string(newlineDelimited[0][1:]), b)
+		} else {
+			room = &Room{}
+		}
 	}
 
 	// Parse the user sending a command, and their auth level.
 	switch strings.ToLower(command) {
 	case "c:":
 		auth = string(vertbarDelimited[3][0])
-		user = &User{Name: string(vertbarDelimited[3][1:])}
-		b.UserList[user] = true
+		user = FindUserEnsured(string(vertbarDelimited[3][1:]), b)
 	case "c":
 		fallthrough
 	case "j":
@@ -90,8 +101,7 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 		fallthrough
 	case "pm":
 		auth = string(vertbarDelimited[2][0])
-		user = &User{Name: string(vertbarDelimited[2][1:])}
-		b.UserList[user] = true
+		user = FindUserEnsured(string(vertbarDelimited[2][1:]), b)
 	}
 
 	// Parse the message
@@ -116,4 +126,17 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 // Reply to a message
 func (m *Message) Reply(res string) {
 	m.Target.Reply(res, m, m.Bot)
+}
+
+// Add matches to the message and return true if there was no previous match
+// and if there was indeed a match.
+func (m *Message) Match(r *regexp.Regexp, event string) bool {
+	if m.Matches[event][r] == nil {
+		matches := r.FindStringSubmatch(m.Message)
+		if matches != nil {
+			m.Matches[event][r] = matches
+			return true
+		}
+	}
+	return false
 }
