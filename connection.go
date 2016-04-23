@@ -26,7 +26,7 @@ type Connection struct {
 	outQueue  chan string
 }
 
-// Connect to the server websocket and initialize reading and writing threads.
+// Connects to the server websocket and initialize reading and writing threads.
 func (c *Connection) Connect() {
 	host := c.Bot.Config.Server + ":" + c.Bot.Config.Port
 	u := url.URL{Scheme: "ws", Host: host, Path: "/showdown/websocket"}
@@ -134,6 +134,7 @@ func Send(c *Connection, s string) {
 	}
 }
 
+// Parses the message and difers it to a relevant handler.
 func (c *Connection) parse(s string) {
 	msg := NewMessage(s, c.Bot)
 	events := make(chan string, 16)

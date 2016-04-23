@@ -9,7 +9,6 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Information from config file
 type Config struct {
 	Server            string
 	Port              string
@@ -22,7 +21,7 @@ type Config struct {
 	PluginPrefix      *regexp.Regexp
 }
 
-// Read the config data from toml
+// Reads the config data from toml config file.
 func ReadConfig() *Config {
 	configfile := "config.toml"
 	_, err := os.Stat(configfile)

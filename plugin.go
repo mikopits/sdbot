@@ -171,7 +171,7 @@ func (p *Plugin) Listen() {
 					go p.EventHandler.HandleChatEvents(m, prefix, args, rest)
 				}
 			case m := <-*p.Bot.PluginPrivateChannels[p.Name]:
-				//Debug(&Log, fmt.Sprintf("[message=%+v]", m))
+				Debug(&Log, fmt.Sprintf("[message=%+v]", m))
 				match, prefix, args, rest := p.Match(m)
 				//Debug(&Log, fmt.Sprintf("[match=%t] [prefix=%s] [args=%s] [rest=%s]", match, prefix, args, rest))
 				if match {

@@ -5,16 +5,16 @@ import (
 )
 
 const (
-	Administrator = "~"
-	TheImmortal   = ">"
-	Leader        = "&"
-	RoomOwner     = "#"
-	Driver        = "%"
-	Battler       = "★"
-	Voiced        = "+"
-	Unvoiced      = " "
-	Muted         = "?"
-	Locked        = "‽"
+	Administrator = `~`
+	TheImmortal   = `>`
+	Leader        = `&`
+	RoomOwner     = `#`
+	Driver        = `%`
+	Battler       = `★`
+	Voiced        = `+`
+	Unvoiced      = ` `
+	Muted         = `?`
+	Locked        = `‽`
 )
 
 type User struct {
@@ -34,20 +34,32 @@ func NewUser(name string) *User {
 	}
 }
 
-// TODO Add an option or another method to reply without the user name.
+// Responds to a user in private message.
 func (u *User) Reply(res string, msg *Message, bot *Bot) {
 	bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,(%s) %s", u.Name, msg.User.Name, res))
 }
 
-// TODO Add an option or another method to reply without the user name.
+// Responds to a user in a room.
 func (r *Room) Reply(res string, msg *Message, bot *Bot) {
 	bot.Connection.QueueMessage(fmt.Sprintf("%s|(%s) %s", r.Name, msg.User.Name, res))
 }
 
+// Responds to a user in private message without prepending their username.
+func (u *User) RawReply(res string, msg *Message, bot *Bot) {
+	bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,%s", u.Name, res))
+}
+
+// Responds to a user in a room without prepending their username.
+func (r *Room) RawReply(res string, msg *Message, bot *Bot) {
+	bot.Connection.QueueMessage(fmt.Sprintf("%s|%s", r.Name, res))
+}
+
+// Add a room authority to the user.
 func (u *User) AddAuth(room string, auth string) {
 	u.Auths[Sanitize(room)] = auth
 }
 
+// Adds a user to the room.
 func (r *Room) AddUser(name string) {
 	sn := Sanitize(name)
 	for _, n := range r.Users {
@@ -59,6 +71,7 @@ func (r *Room) AddUser(name string) {
 	r.Users = append(r.Users, sn)
 }
 
+// Removes a user from the room.
 func (r *Room) RemoveUser(name string) {
 	sn := Sanitize(name)
 	for i, n := range r.Users {
@@ -69,6 +82,7 @@ func (r *Room) RemoveUser(name string) {
 	}
 }
 
+// Finds a user if it exists, creates the user if it doesn't.
 func FindUserEnsured(name string, bot *Bot) *User {
 	sn := Sanitize(name)
 
@@ -86,6 +100,7 @@ func FindUserEnsured(name string, bot *Bot) *User {
 	return bot.Synchronize("room", &updateUsers).(*User)
 }
 
+// Finds a room if it exists, creates the room if it doesn't.
 func FindRoomEnsured(name string, bot *Bot) *Room {
 	sn := Sanitize(name)
 
@@ -103,18 +118,26 @@ func FindRoomEnsured(name string, bot *Bot) *Room {
 	return bot.Synchronize("user", &updateRooms).(*Room)
 }
 
+// Renames a user.
 func Rename(old string, s string, bot *Bot) {
 	so := Sanitize(old)
 	sn := Sanitize(s)
 
-	if bot.UserList[so] != nil {
-		u := bot.UserList[so]
-		delete(bot.UserList, so)
-		u.Name = s
-		bot.UserList[sn] = u
+	var rename = func() interface{} {
+		if bot.UserList[so] != nil {
+			u := bot.UserList[so]
+			delete(bot.UserList, so)
+			u.Name = s
+			bot.UserList[sn] = u
+		}
+		return nil
 	}
+
+	bot.Synchronize("user", &rename)
 }
 
+// A Target can be either a Room or a User. It represents where the bot will
+// send its message in response.
 type Target interface {
 	Reply(string, *Message, *Bot)
 }
