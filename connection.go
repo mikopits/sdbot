@@ -3,7 +3,6 @@ package sdbot
 import (
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,7 +82,6 @@ func (c *Connection) startReading() {
 			c.parse(fmt.Sprintf("%s\n%s", room, rawmessage))
 		}
 	}
-
 }
 
 func (c *Connection) startSending() {
@@ -95,7 +93,7 @@ func (c *Connection) startSending() {
 		select {
 		case msg := <-c.outQueue:
 			Send(c, msg)
-			ms := math.Floor(1000.0 / c.Bot.Config.MessagesPerSecond)
+			ms := 1000.0 / c.Bot.Config.MessagesPerSecond
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 		case <-interrupt:
 			Warn(&Log, "Process was interrupted. Closing connection...")

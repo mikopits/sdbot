@@ -1,7 +1,6 @@
 package sdbot
 
 import (
-	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -97,12 +96,32 @@ func (p *Plugin) FormatPrefixAndSuffix() {
 	ps := p.Prefix.String()
 	ss := p.Suffix.String()
 	var flags string
+	var args string
 
 	if p.Bot.Config.CaseInsensitive {
 		flags = "(?i)"
 	}
 
-	p.Prefix = regexp.MustCompile(fmt.Sprintf("^(%s%s%s)", flags, ps[1:], p.Command))
+	if p.NumArgs > 0 {
+		if p.NumArgs == 1 {
+			args = " +(.+)"
+		} else {
+			args = " +([^,]+)"
+		}
+		for i := 0; i < p.NumArgs-1; i++ {
+			if i == p.NumArgs-2 {
+				args = strings.Join([]string{args, ", +(.+)"}, "")
+			} else {
+				args = strings.Join([]string{args, ", +([^,]+)"}, "")
+			}
+		}
+	} else {
+		p.Prefix = regexp.MustCompile(fmt.Sprintf("^(%s%s%s$)", flags, ps[1:], p.Command))
+		p.Suffix = regexp.MustCompile(fmt.Sprintf("(%s%s)$", flags, ss[:len(ss)-1]))
+		return
+	}
+
+	p.Prefix = regexp.MustCompile(fmt.Sprintf("^(%s%s%s%s)", flags, ps[1:], p.Command, args))
 	p.Suffix = regexp.MustCompile(fmt.Sprintf("(%s%s)$", flags, ss[:len(ss)-1]))
 }
 
@@ -148,25 +167,17 @@ func (p *Plugin) match(m *Message) bool {
 // 1. The arguments provided. (eg. !echoNTimes 5, "Hello World") for prefix "!",
 // command "echoNTimes", numArgs 1 will give input "Hello World" and args ["5"]
 func (p *Plugin) parse(m *Message) (string, []string) {
-	Debug(&Log, fmt.Sprintf("[msg=%s] [fs1=%s] [fs2=%s] [pre=%+v] [suf=%+v]", m.Message, p.Prefix.FindString(m.Message), p.Suffix.FindString(m.Message), p.Prefix, p.Suffix))
-	input := m.Message[len(p.Prefix.FindString(m.Message)) : len(m.Message)-len(p.Suffix.FindString(m.Message))]
-	if p.NumArgs == 0 {
-		return strings.TrimSpace(input), nil
+	submatches := p.Prefix.FindStringSubmatch(m.Message)
+	//Debug(&Log, fmt.Sprintf("[submatches=%q]", submatches))
+
+	switch p.NumArgs {
+	case 0:
+		return "", nil
+	case 1:
+		return strings.TrimSpace(submatches[3]), nil
+	default:
+		return submatches[3], submatches[4:]
 	}
-
-	var args []string
-	var buffer bytes.Buffer
-
-	for i, arg := range strings.Split(input, "|") {
-		if i < p.NumArgs {
-			args = append(args, strings.TrimSpace(arg))
-		} else {
-			buffer.WriteString(",")
-			buffer.WriteString(arg)
-		}
-	}
-
-	return strings.TrimSpace(buffer.String()), args
 }
 
 // Starts a loop in its own goroutine looking for events.
@@ -177,13 +188,13 @@ func (p *Plugin) Listen() {
 			case m := <-*p.Bot.PluginChatChannels[p.Name]:
 				if p.match(m) {
 					input, args := p.parse(m)
-					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s`", p.Name))
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
 					go p.EventHandler.HandleChatEvents(m, input, args)
 				}
 			case m := <-*p.Bot.PluginPrivateChannels[p.Name]:
 				if p.match(m) {
 					input, args := p.parse(m)
-					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s`", p.Name))
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
 					go p.EventHandler.HandlePrivateEvents(m, input, args)
 				}
 			}
