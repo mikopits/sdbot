@@ -17,7 +17,7 @@ MessagesPerSecond = 3.0
 
 # The rooms the bot will automatically join.
 # Keep in mind that bots are not allowed in the lobby.
-Rooms = ["showderp"]
+Rooms = ["techcode"]
 
 # The avatar you want the bot use.
 # Set to "0" to get a default avatar.
@@ -26,3 +26,12 @@ Avatar = "0"
 
 # The prefixes you want the bot to trigger commands on by default.
 PluginPrefixes = ["."]
+
+# The suffixes you want the bot to trigger commands on by default.
+# If you set both a set of prefixes and suffixes then you must match both to
+# to trigger a plugin's event handler.
+#PluginSuffixes = ["!"]
+
+# Set to true if you want your matches to be case insensitive.
+# eg. ".echo Hello World" and ".EchO Hello World" will both trigger and event.
+CaseInsensitive = true

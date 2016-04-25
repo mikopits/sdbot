@@ -1,36 +1,32 @@
+// +build ignore
+
 package plugins
 
 import (
-	"sdbot"
+	"github.com/mikopits/sdbot"
 )
 
-// We don't have the bot yet, so define a function literal that we can call at
-// a later time.
+// We don't have the bot yet, so define a function literal that allows us to
+// set the bot at any time. If you want to define the plugins in the main
+// loop alongside the bot then there is no need to do this.
 var HelloWorldPlugin = func(b *sdbot.Bot) *sdbot.Plugin {
-	p := &sdbot.Plugin{
-		Bot:      b,
-		Prefixes: []string{},
-		Command:  "hi",
-		Cooldown: 5,
-		NumArgs:  0,
-	}
-	p.EventHandler = &HelloWorldEventHandler{Plugin: p}
+	p := NewPluginWithCooldown(b, "hi", 5)
+	p.EventHandler = NewDefaultEventHandler(p)
 	return p
 }
 
-type HelloWorldEventHandler struct {
-	Plugin *sdbot.Plugin
-}
+// Set up an alias since we are using the default event handler.
+type HelloWorldEventHandler sdbot.DefaultEventHandler
 
-func (eh *HelloWorldEventHandler) HandleChatEvents(m *sdbot.Message, prefix string, args []string, rest string) {
-	if int(m.Time.Unix()-eh.Plugin.LastUsed.Unix()) < eh.Plugin.Cooldown {
+func (eh HelloWorldEventHandler) HandleChatEvents(m *sdbot.Message, input string, args []string) {
+	if int(m.Time.Unix()-eh.LastUsed.Unix()) < eh.Plugin.Cooldown {
 		m.Reply("cooldown not done")
 	} else {
 		m.Reply("hi :)")
 	}
-	eh.Plugin.LastUsed = m.Time
+	eh.LastUsed = m.Time
 }
 
-func (eh *HelloWorldEventHandler) HandlePrivateEvents(m *sdbot.Message, prefix string, args []string, rest string) {
+func (eh HelloWorldEventHandler) HandlePrivateEvents(m *sdbot.Message, input string, args []string) {
 	eh.HandleChatEvents(m, prefix, args, rest)
 }

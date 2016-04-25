@@ -111,22 +111,32 @@ func (b *Bot) Login(msg *Message) {
 
 // Joins a room.
 func (b *Bot) JoinRoom(room *Room) {
-	b.Rooms = append(b.Rooms, room.Name)
-	if b.RoomList[room.Name] != nil {
-		b.RoomList[room.Name] = room
+	var joinRoom = func() interface{} {
+		b.Rooms = append(b.Rooms, room.Name)
+		if b.RoomList[room.Name] != nil {
+			b.RoomList[room.Name] = room
+		}
+		return nil
 	}
+
+	b.Synchronize("room", &joinRoom)
 
 	b.Connection.QueueMessage("|/join " + room.Name)
 }
 
 // Leaves a room.
 func (b *Bot) LeaveRoom(room *Room) {
-	for i, r := range b.Rooms {
-		if room.Name == r {
-			b.Rooms = append(b.Rooms[:i], b.Rooms[i+1:]...)
+	var leaveRoom = func() interface{} {
+		for i, r := range b.Rooms {
+			if room.Name == r {
+				b.Rooms = append(b.Rooms[:i], b.Rooms[i+1:]...)
+			}
 		}
+		delete(b.RoomList, room.Name)
+		return nil
 	}
-	delete(b.RoomList, room.Name)
+
+	b.Synchronize("room", &leaveRoom)
 
 	b.Connection.QueueMessage("|/leave " + room.Name)
 }
@@ -151,10 +161,15 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 		p.Bot = b
 		p.Name = name
 
-		// Load prefixes from the config if none were provided.
-		if len(p.Prefixes) == 0 {
-			p.Prefixes = b.Config.PluginPrefixes
+		// Load prefix and suffix from the config if none were provided.
+		if p.Prefix == nil {
+			p.Prefix = b.Config.PluginPrefix
 		}
+		if p.Suffix == nil {
+			p.Suffix = b.Config.PluginSuffix
+		}
+
+		p.FormatPrefixAndSuffix()
 
 		chatChannel := make(chan *Message, 64)
 		privateChannel := make(chan *Message, 64)

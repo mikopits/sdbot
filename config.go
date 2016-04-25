@@ -1,10 +1,10 @@
 package sdbot
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -18,7 +18,10 @@ type Config struct {
 	Rooms             []string
 	Avatar            int
 	PluginPrefixes    []string
+	PluginSuffixes    []string
 	PluginPrefix      *regexp.Regexp
+	PluginSuffix      *regexp.Regexp
+	CaseInsensitive   bool
 }
 
 // Reads the config data from toml config file.
@@ -35,16 +38,27 @@ func ReadConfig() *Config {
 	}
 
 	config.generatePluginPrefixRegexp()
+	config.generatePluginSuffixRegexp()
 
 	return &config
 }
 
 func (c *Config) generatePluginPrefixRegexp() {
-	var buffer bytes.Buffer
-
-	for _, prefix := range c.PluginPrefixes {
-		buffer.WriteString(prefix)
+	regStr := "^(" + strings.Join(c.PluginPrefixes, "|") + ")"
+	reg, err := regexp.Compile(regexp.QuoteMeta(regStr))
+	if err != nil {
+		Error(&Log, err)
 	}
 
-	c.PluginPrefix = regexp.MustCompile("^" + regexp.QuoteMeta(buffer.String()))
+	c.PluginPrefix = reg
+}
+
+func (c *Config) generatePluginSuffixRegexp() {
+	regStr := "(" + strings.Join(c.PluginSuffixes, "|") + ")$"
+	reg, err := regexp.Compile(regexp.QuoteMeta(regStr))
+	if err != nil {
+		Error(&Log, err)
+	}
+
+	c.PluginSuffix = reg
 }

@@ -3,7 +3,7 @@ package sdbot
 import (
 	"bytes"
 	"fmt"
-	"math"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -13,82 +13,108 @@ import (
 type Plugin struct {
 	Bot          *Bot
 	Name         string
-	Prefixes     []string
+	Prefix       *regexp.Regexp
+	Suffix       *regexp.Regexp
 	Command      string
 	NumArgs      int
 	Cooldown     int
-	LastUsed     time.Time
 	EventHandler EventHandler
 }
 
 // Define different convenient ways to make new Plugin structs. You must add
-// the bot and event handlers after creation with these methods.
-func NewPlugin(b *Bot, cmd string, prefixes ...string) *Plugin {
-	var p []string
-	if prefixes != nil {
-		p = prefixes
-	} else {
-		p = b.Config.PluginPrefixes
-	}
-
+// the bot and event handlers after creation with these methods. If you want
+// to add custom prefixes or suffixes, you can do it with the Plugin.SetPrefix
+// and Plugin.SetSuffix methods. Otherwise the bot will load prefixes and
+// suffixes from your Config.
+func NewPlugin(b *Bot, cmd string) *Plugin {
 	return &Plugin{
-		Bot:      b,
-		Command:  cmd,
-		Prefixes: p,
+		Bot:     b,
+		Command: cmd,
 	}
 }
 
-func NewPluginWithArgs(b *Bot, cmd string, numArgs int, prefixes ...string) *Plugin {
-	var p []string
-	if prefixes != nil {
-		p = prefixes
-	} else {
-		p = b.Config.PluginPrefixes
-	}
-
+func NewPluginWithArgs(b *Bot, cmd string, numArgs int) *Plugin {
 	return &Plugin{
-		Bot:      b,
-		Command:  cmd,
-		NumArgs:  numArgs,
-		Prefixes: p,
+		Bot:     b,
+		Command: cmd,
+		NumArgs: numArgs,
 	}
 }
 
-func NewPluginWithCooldown(b *Bot, cmd string, cooldown int, prefixes ...string) *Plugin {
-	var p []string
-	if prefixes != nil {
-		p = prefixes
-	} else {
-		p = b.Config.PluginPrefixes
-	}
-
+func NewPluginWithCooldown(b *Bot, cmd string, cooldown int) *Plugin {
 	return &Plugin{
 		Bot:      b,
 		Command:  cmd,
 		Cooldown: cooldown,
-		Prefixes: p,
 	}
 }
 
-func NewPluginWithArgsAndCooldown(b *Bot, cmd string, numArgs int, cooldown int, prefixes ...string) *Plugin {
-	var p []string
-	if prefixes != nil {
-		p = prefixes
-	} else {
-		p = b.Config.PluginPrefixes
-	}
-
+func NewPluginWithArgsAndCooldown(b *Bot, cmd string, numArgs int, cooldown int) *Plugin {
 	return &Plugin{
 		Bot:      b,
 		Command:  cmd,
 		NumArgs:  numArgs,
 		Cooldown: cooldown,
-		Prefixes: p,
 	}
 }
 
+// Call this if you want this plugin to match to prefixes other than the
+// default prefixes defined in your Config.
+func (p *Plugin) SetPrefix(prefixes []string) {
+	if len(prefixes) == 0 {
+		return
+	}
+
+	regStr := "^(" + strings.Join(prefixes, "|") + ")"
+	reg, err := regexp.Compile(regStr)
+	if err != nil {
+		Error(&Log, err)
+	}
+
+	p.Prefix = reg
+}
+
+// Call this if you want this plugin to match to suffixes other than the
+// default suffixes defined in your Config.
+func (p *Plugin) SetSuffix(suffixes []string) {
+	if len(suffixes) == 0 {
+		return
+	}
+
+	regStr := "(" + strings.Join(suffixes, "|") + ")$"
+	reg, err := regexp.Compile(regStr)
+	if err != nil {
+		Error(&Log, err)
+	}
+
+	p.Suffix = reg
+}
+
+func (p *Plugin) FormatPrefixAndSuffix() {
+	ps := p.Prefix.String()
+	ss := p.Suffix.String()
+	var flags string
+
+	if p.Bot.Config.CaseInsensitive {
+		flags = "(?i)"
+	}
+
+	p.Prefix = regexp.MustCompile(fmt.Sprintf("^(%s%s%s)", flags, ps[1:], p.Command))
+	p.Suffix = regexp.MustCompile(fmt.Sprintf("(%s%s%s)$", flags, ss[:len(ps)-1], p.Command))
+}
+
+// Allows you to use a custom event handler with any fields you want.
 func (p *Plugin) SetEventHandler(eh EventHandler) {
 	p.EventHandler = eh
+}
+
+type DefaultEventHandler struct {
+	Plugin   *Plugin
+	LastUsed time.Time
+}
+
+func NewDefaultEventHandler(p *Plugin) *DefaultEventHandler {
+	return &DefaultEventHandler{Plugin: p}
 }
 
 type TimedPlugin struct {
@@ -99,8 +125,8 @@ type TimedPlugin struct {
 }
 
 type EventHandler interface {
-	HandleChatEvents(*Message, string, []string, string)
-	HandlePrivateEvents(*Message, string, []string, string)
+	HandleChatEvents(*Message, string, []string)
+	HandlePrivateEvents(*Message, string, []string)
 }
 
 type TimedEventHandler interface {
@@ -108,53 +134,35 @@ type TimedEventHandler interface {
 	Stop()
 }
 
-// Checks if the message matches the plugin and returns:
-// If it matched or not (bool)
-// The prefix that matched (string)
-// The arguments that were passed alongside the command ([]string)
-// The rest of the command (string)
-func (p *Plugin) Match(m *Message) (bool, string, []string, string) {
-	msg := m.Message
+// Find out if the message is a match for this plugin.
+func (p *Plugin) match(m *Message) bool {
+	return p.Prefix.MatchString(m.Message) && p.Suffix.MatchString(m.Message)
+}
 
-	var match string
-
-	for _, prefix := range p.Prefixes {
-		if msg[0:int(math.Min(float64(len(prefix)), float64(len(msg))))] == prefix {
-			match = prefix
-		}
+// Parse the message. Returns values:
+// 0. The command input. (eg. !echo Hello World) for prefix "!", command "echo",
+// numArgs 0 will give input "Hello World".
+// 1. The arguments provided. (eg. !echoNTimes 5, "Hello World") for prefix "!",
+// command "echoNTimes", numArgs 1 will give input "Hello World" and args ["5"]
+func (p *Plugin) parse(m *Message) (string, []string) {
+	input := m.Message[len(p.Prefix.FindString(m.Message)) : len(m.Message)-len(p.Suffix.FindString(m.Message))]
+	if p.NumArgs == 0 {
+		return strings.TrimSpace(input), nil
 	}
-
-	// No prefix matched
-	if match == "" {
-		return false, "", []string{}, ""
-	}
-
-	// Command not matched
-	if msg[len(match):][:len(p.Command)] != p.Command {
-		return false, "", []string{}, ""
-	}
-
-	// Comma separated message
-	cs := strings.Split(msg[len(match)+len(p.Command):], ",")
 
 	var args []string
-	var rest bytes.Buffer
+	var buffer bytes.Buffer
 
-	for i, arg := range cs {
+	for i, arg := range strings.Split(input, "|") {
 		if i < p.NumArgs {
 			args = append(args, strings.TrimSpace(arg))
 		} else {
-			rest.WriteString(",")
-			rest.WriteString(arg)
+			buffer.WriteString(",")
+			buffer.WriteString(arg)
 		}
 	}
 
-	// Wrong number of arguments
-	if p.NumArgs != len(args) {
-		return false, "", []string{}, ""
-	}
-
-	return true, match, args, strings.TrimSpace(rest.String())
+	return strings.TrimSpace(buffer.String()), args
 }
 
 // Starts a loop in its own goroutine looking for events.
@@ -163,17 +171,16 @@ func (p *Plugin) Listen() {
 		for {
 			select {
 			case m := <-*p.Bot.PluginChatChannels[p.Name]:
-				match, prefix, args, rest := p.Match(m)
-				if match {
+				if p.match(m) {
+					input, args := p.parse(m)
 					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s`", p.Name))
-					go p.EventHandler.HandleChatEvents(m, prefix, args, rest)
+					go p.EventHandler.HandleChatEvents(m, input, args)
 				}
 			case m := <-*p.Bot.PluginPrivateChannels[p.Name]:
-				Debug(&Log, fmt.Sprintf("[user=%+v]", m.User))
-				match, prefix, args, rest := p.Match(m)
-				if match {
+				if p.match(m) {
+					input, args := p.parse(m)
 					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s`", p.Name))
-					go p.EventHandler.HandlePrivateEvents(m, prefix, args, rest)
+					go p.EventHandler.HandlePrivateEvents(m, input, args)
 				}
 			}
 		}
