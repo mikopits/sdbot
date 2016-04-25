@@ -1,5 +1,3 @@
-// +build ignore
-
 package plugins
 
 import (
@@ -10,8 +8,8 @@ import (
 // set the bot at any time. If you want to define the plugins in the main
 // loop alongside the bot then there is no need to do this.
 var HelloWorldPlugin = func(b *sdbot.Bot) *sdbot.Plugin {
-	p := NewPluginWithCooldown(b, "hi", 5)
-	p.EventHandler = NewDefaultEventHandler(p)
+	p := sdbot.NewPluginWithCooldown(b, "hi", 5)
+	p.EventHandler = &HelloWorldEventHandler{Plugin: p}
 	return p
 }
 
@@ -28,5 +26,5 @@ func (eh HelloWorldEventHandler) HandleChatEvents(m *sdbot.Message, input string
 }
 
 func (eh HelloWorldEventHandler) HandlePrivateEvents(m *sdbot.Message, input string, args []string) {
-	eh.HandleChatEvents(m, prefix, args, rest)
+	eh.HandleChatEvents(m, input, args)
 }
