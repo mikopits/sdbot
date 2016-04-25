@@ -9,7 +9,7 @@ Port = "8000"
 Nick = ""
 
 # The password for the above registered username.
-# Leave it blank ("") if you are using an unregistered name.
+# Leave it blank ("") or do not set if you are using an unregistered name.
 Password = ""
 
 # The rate at which the bot will send messages at. Recommended value is 3.
@@ -20,9 +20,9 @@ MessagesPerSecond = 3.0
 Rooms = ["techcode"]
 
 # The avatar you want the bot use.
-# Set to "0" to get a default avatar.
-# Anything from "1" to "294" works.
-Avatar = "0"
+# Set to 0 or do not set to get a default avatar.
+# Anything from 1 to 294 works.
+Avatar = 0
 
 # The prefixes you want the bot to trigger commands on by default.
 PluginPrefixes = ["."]
