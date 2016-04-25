@@ -45,7 +45,7 @@ func ReadConfig() *Config {
 
 func (c *Config) generatePluginPrefixRegexp() {
 	regStr := "^(" + strings.Join(c.PluginPrefixes, "|") + ")"
-	reg, err := regexp.Compile(regexp.QuoteMeta(regStr))
+	reg, err := regexp.Compile(regStr)
 	if err != nil {
 		Error(&Log, err)
 	}
@@ -55,7 +55,7 @@ func (c *Config) generatePluginPrefixRegexp() {
 
 func (c *Config) generatePluginSuffixRegexp() {
 	regStr := "(" + strings.Join(c.PluginSuffixes, "|") + ")$"
-	reg, err := regexp.Compile(regexp.QuoteMeta(regStr))
+	reg, err := regexp.Compile(regStr)
 	if err != nil {
 		Error(&Log, err)
 	}

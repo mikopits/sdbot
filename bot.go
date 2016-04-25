@@ -153,7 +153,6 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 		}
 	}
 
-	Debug(&Log, fmt.Sprintf("[on bot] Registering plugin `%s`", name))
 	if b.PluginChatChannels[name] != nil {
 		Error(&Log, ErrPluginNameAlreadyRegistered)
 		return ErrPluginNameAlreadyRegistered
@@ -170,6 +169,7 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 		}
 
 		p.FormatPrefixAndSuffix()
+		Debug(&Log, fmt.Sprintf("[on bot] Registering plugin `%s` listening on `%v` and `%v`", name, p.Prefix, p.Suffix))
 
 		chatChannel := make(chan *Message, 64)
 		privateChannel := make(chan *Message, 64)

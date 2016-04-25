@@ -10,6 +10,8 @@ import (
 
 // TODO Add a Killable struct to add functionality to break out of the
 // Plugin.Listen loop.
+//
+// TODO Automation of cooldown. Should not have to implement it in a plugin.
 type Plugin struct {
 	Bot          *Bot
 	Name         string
@@ -18,6 +20,7 @@ type Plugin struct {
 	Command      string
 	NumArgs      int
 	Cooldown     int
+	LastUsed     time.Time
 	EventHandler EventHandler
 }
 
@@ -100,7 +103,7 @@ func (p *Plugin) FormatPrefixAndSuffix() {
 	}
 
 	p.Prefix = regexp.MustCompile(fmt.Sprintf("^(%s%s%s)", flags, ps[1:], p.Command))
-	p.Suffix = regexp.MustCompile(fmt.Sprintf("(%s%s%s)$", flags, ss[:len(ps)-1], p.Command))
+	p.Suffix = regexp.MustCompile(fmt.Sprintf("(%s%s)$", flags, ss[:len(ss)-1]))
 }
 
 // Allows you to use a custom event handler with any fields you want.
@@ -145,6 +148,7 @@ func (p *Plugin) match(m *Message) bool {
 // 1. The arguments provided. (eg. !echoNTimes 5, "Hello World") for prefix "!",
 // command "echoNTimes", numArgs 1 will give input "Hello World" and args ["5"]
 func (p *Plugin) parse(m *Message) (string, []string) {
+	Debug(&Log, fmt.Sprintf("[msg=%s] [fs1=%s] [fs2=%s] [pre=%+v] [suf=%+v]", m.Message, p.Prefix.FindString(m.Message), p.Suffix.FindString(m.Message), p.Prefix, p.Suffix))
 	input := m.Message[len(p.Prefix.FindString(m.Message)) : len(m.Message)-len(p.Suffix.FindString(m.Message))]
 	if p.NumArgs == 0 {
 		return strings.TrimSpace(input), nil
