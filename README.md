@@ -41,7 +41,7 @@ func main() {
   b := sdbot.NewBot()
   p := plugins.HelloWorldPlugin(b)
   b.RegisterPlugin(p, "hello world")
-  bot.Connection.Connect()
+  b.Connection.Connect()
 }
 ```
 
