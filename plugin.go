@@ -9,8 +9,6 @@ import (
 
 // TODO Add a Killable struct to add functionality to break out of the
 // Plugin.Listen loop.
-//
-// TODO Automation of cooldown. Should not have to implement it in a plugin.
 type Plugin struct {
 	Bot          *Bot
 	Name         string
@@ -18,7 +16,7 @@ type Plugin struct {
 	Suffix       *regexp.Regexp
 	Command      string
 	NumArgs      int
-	Cooldown     int
+	Cooldown     time.Duration
 	LastUsed     time.Time
 	EventHandler EventHandler
 }
@@ -43,7 +41,7 @@ func NewPluginWithArgs(b *Bot, cmd string, numArgs int) *Plugin {
 	}
 }
 
-func NewPluginWithCooldown(b *Bot, cmd string, cooldown int) *Plugin {
+func NewPluginWithCooldown(b *Bot, cmd string, cooldown time.Duration) *Plugin {
 	return &Plugin{
 		Bot:      b,
 		Command:  cmd,
@@ -51,7 +49,7 @@ func NewPluginWithCooldown(b *Bot, cmd string, cooldown int) *Plugin {
 	}
 }
 
-func NewPluginWithArgsAndCooldown(b *Bot, cmd string, numArgs int, cooldown int) *Plugin {
+func NewPluginWithArgsAndCooldown(b *Bot, cmd string, numArgs int, cooldown time.Duration) *Plugin {
 	return &Plugin{
 		Bot:      b,
 		Command:  cmd,
@@ -146,9 +144,9 @@ type TimedPlugin struct {
 	TimedEventHandler TimedEventHandler
 }
 
+// Inputs will be Message, input, args, private?
 type EventHandler interface {
-	HandleChatEvents(*Message, string, []string)
-	HandlePrivateEvents(*Message, string, []string)
+	HandleEvent(*Message, string, []string, bool)
 }
 
 type TimedEventHandler interface {
@@ -168,7 +166,6 @@ func (p *Plugin) match(m *Message) bool {
 // command "echoNTimes", numArgs 1 will give input "Hello World" and args ["5"]
 func (p *Plugin) parse(m *Message) (string, []string) {
 	submatches := p.Prefix.FindStringSubmatch(m.Message)
-	//Debug(&Log, fmt.Sprintf("[submatches=%q]", submatches))
 
 	switch p.NumArgs {
 	case 0:
@@ -188,14 +185,20 @@ func (p *Plugin) Listen() {
 			case m := <-*p.Bot.PluginChatChannels[p.Name]:
 				if p.match(m) {
 					input, args := p.parse(m)
-					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
-					go p.EventHandler.HandleChatEvents(m, input, args)
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting chat event handler goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
+					if m.Time.Sub(p.LastUsed) > p.Cooldown {
+						p.LastUsed = m.Time
+						go p.EventHandler.HandleEvent(m, input, args, false)
+					}
 				}
 			case m := <-*p.Bot.PluginPrivateChannels[p.Name]:
 				if p.match(m) {
 					input, args := p.parse(m)
-					Debug(&Log, fmt.Sprintf("[on plugin] Starting goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
-					go p.EventHandler.HandlePrivateEvents(m, input, args)
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting private event handler goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
+					if m.Time.Sub(p.LastUsed) > p.Cooldown {
+						p.LastUsed = m.Time
+						go p.EventHandler.HandleEvent(m, input, args, true)
+					}
 				}
 			}
 		}

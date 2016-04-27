@@ -128,6 +128,7 @@ func (m *Message) Reply(res string) {
 	m.Target.Reply(m, res)
 }
 
+// Reply to a message without prepending the user's name
 func (m *Message) RawReply(res string) {
 	m.Target.RawReply(m, res)
 }

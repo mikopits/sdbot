@@ -6,16 +6,29 @@ import (
 
 const (
 	Administrator = `~`
-	TheImmortal   = `>`
 	Leader        = `&`
 	RoomOwner     = `#`
 	Driver        = `%`
+	TheImmortal   = `>`
 	Battler       = `★`
 	Voiced        = `+`
 	Unvoiced      = ` `
 	Muted         = `?`
 	Locked        = `‽`
 )
+
+var AuthLevels = map[string]int{
+	Locked:        0,
+	Muted:         1,
+	Unvoiced:      2,
+	Voiced:        3,
+	Battler:       4,
+	TheImmortal:   5,
+	Driver:        6,
+	RoomOwner:     7,
+	Leader:        8,
+	Administrator: 9,
+}
 
 type User struct {
 	Name  string
@@ -134,6 +147,11 @@ func Rename(old string, s string, bot *Bot) {
 	}
 
 	bot.Synchronize("user", &rename)
+}
+
+// Check if a user has AT LEAST a given authorization level in a given room.
+func (u *User) HasAuth(roomname string, level string) bool {
+	return AuthLevels[u.Auths[roomname]] >= AuthLevels[level]
 }
 
 // A Target can be either a Room or a User. It represents where the bot will

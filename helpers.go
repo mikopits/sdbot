@@ -1,6 +1,11 @@
 package sdbot
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"io/ioutil"
+	"net/http"
 	"regexp"
 	"strings"
 )
@@ -11,9 +16,50 @@ import (
 // downcased and sanitized username is a unique identifier.
 func Sanitize(s string) string {
 	reg, err := regexp.Compile("[^A-Za-z0-9]")
+	CheckErr(err)
+
+	return strings.ToLower(reg.ReplaceAllString(s, ""))
+}
+
+// Public API for errorchecking.
+func CheckErr(err error) {
 	if err != nil {
 		Error(&Log, err)
 	}
+}
 
-	return strings.ToLower(reg.ReplaceAllString(s, ""))
+type HasteKey struct {
+	Key string
+}
+
+// Upload to Hastebin and return the response URL.
+func Haste(buf io.Reader, bodyType string) (string, error) {
+	data, err := ioutil.ReadAll(buf)
+	if err != nil {
+		Error(&Log, err)
+		return "", err
+	}
+
+	trimmedData := strings.TrimRight(string(data), "\r\n")
+
+	res, err := http.Post("http://hastebin.com/documents", bodyType, bytes.NewBufferString(trimmedData))
+	if err != nil {
+		Error(&Log, err)
+		return "", err
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		Error(&Log, err)
+		return "", err
+	}
+
+	var hk HasteKey
+	err = json.Unmarshal(body, &hk)
+	if err != nil {
+		Error(&Log, err)
+		return "", err
+	}
+
+	return "http://hastebin.com/" + hk.Key, nil
 }

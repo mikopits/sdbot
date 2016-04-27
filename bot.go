@@ -144,7 +144,7 @@ func (b *Bot) LeaveRoom(room *Room) {
 var ErrPluginNameAlreadyRegistered = errors.New("sdbot: plugin name was already in use (register under another name)")
 var ErrPluginAlreadyRegistered = errors.New("sdbot: plugin was already registered")
 
-// Registers a plugin under a name and start listening on its event handler.
+// Registers a plugin under a name and starts listening on its event handler.
 func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 	for _, plugin := range b.Plugins {
 		if plugin == p {
@@ -179,6 +179,17 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 
 	b.Plugins = append(b.Plugins, p)
 	p.Listen()
+	return nil
+}
+
+// Register a slice of plugins in one call.
+func (b *Bot) RegisterPlugins(plugins map[string]*Plugin) error {
+	for name, p := range plugins {
+		err := b.RegisterPlugin(p, name)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
