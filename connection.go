@@ -70,16 +70,14 @@ func (c *Connection) startReading() {
 			Error(&Log, ErrUnexpectedMessageType)
 		}
 
-		if c.Connected {
-			var room string
-			messages := strings.Split(string(msg), "\n")
-			if string(messages[0][0]) == ">" {
-				room, messages = messages[0], messages[1:]
-			}
+		var room string
+		messages := strings.Split(string(msg), "\n")
+		if string(messages[0][0]) == ">" {
+			room, messages = messages[0], messages[1:]
+		}
 
-			for _, rawmessage := range messages {
-				c.parse(fmt.Sprintf("%s\n%s", room, rawmessage))
-			}
+		for _, rawmessage := range messages {
+			c.parse(fmt.Sprintf("%s\n%s", room, rawmessage))
 		}
 	}
 }
@@ -97,7 +95,6 @@ func (c *Connection) startSending() {
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 		case <-interrupt:
 			Warn(&Log, "Process was interrupted. Closing connection...")
-			c.Connected = false
 
 			// Send a close frame and wait for the server to close the connection.
 			err := c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
@@ -112,6 +109,7 @@ func (c *Connection) startSending() {
 				os.Exit(15)
 			}
 			c.conn.Close()
+			c.Connected = false
 			return
 		}
 	}
