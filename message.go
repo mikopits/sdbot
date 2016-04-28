@@ -145,3 +145,8 @@ func (m *Message) Match(r *regexp.Regexp, event string) bool {
 	}
 	return false
 }
+
+// Returns true if the message was sent in a private message.
+func (m *Message) Private() bool {
+	return m.User == m.Target
+}

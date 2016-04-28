@@ -183,6 +183,7 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 }
 
 // Register a slice of plugins in one call.
+// The map should be formatted with pairs of "plugin name"=>*Plugin.
 func (b *Bot) RegisterPlugins(plugins map[string]*Plugin) error {
 	for name, p := range plugins {
 		err := b.RegisterPlugin(p, name)
@@ -249,6 +250,9 @@ func (b *Bot) StopTimedPlugins() {
 }
 
 // Provides an API to keep your code thread-safe and concurrent.
+// For example, if a plugin is going to write to a file, it would be a bad idea
+// to have multiple threads with different state to try to access the file at
+// the same time. So you should run such commands under Bot.Synchronize.
 // The name is an arbitrary name you can choose for your mutex. The lambda is
 // Then run in the mutex defined by the name. Choose unique names!
 func (b *Bot) Synchronize(name string, lambda *func() interface{}) interface{} {

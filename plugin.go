@@ -33,6 +33,11 @@ func NewPlugin(b *Bot, cmd string) *Plugin {
 	}
 }
 
+// Will be triggered on every chat and private event.
+func NewPluginWithoutCommand(b *Bot) *Plugin {
+	return &Plugin{Bot: b}
+}
+
 func NewPluginWithArgs(b *Bot, cmd string, numArgs int) *Plugin {
 	return &Plugin{
 		Bot:     b,
@@ -139,14 +144,27 @@ func NewDefaultEventHandler(p *Plugin) *DefaultEventHandler {
 
 type TimedPlugin struct {
 	Bot               *Bot
-	Timer             time.Timer    // Timer that events fire on
-	Period            time.Duration // The period over which you want to fire events
+	Ticker            *time.Ticker
 	TimedEventHandler TimedEventHandler
 }
 
-// Inputs will be Message, input, args, private?
+func NewTimedPlugin(b *Bot, period time.Duration) *TimedPlugin {
+	return &TimedPlugin{
+		Bot:    b,
+		Ticker: time.NewTicker(period),
+	}
+}
+
+func (tp *TimedPlugin) SetEventHandler(teh TimedEventHandler) {
+	tp.TimedEventHandler = teh
+}
+
+type DefaultTimedEventHandler struct {
+	TimedPlugin *TimedPlugin
+}
+
 type EventHandler interface {
-	HandleEvent(*Message, string, []string, bool)
+	HandleEvent(*Message, []string)
 }
 
 type TimedEventHandler interface {
@@ -159,45 +177,39 @@ func (p *Plugin) match(m *Message) bool {
 	return p.Prefix.MatchString(m.Message) && p.Suffix.MatchString(m.Message)
 }
 
-// Parse the message. Returns values:
-// 0. The command input. (eg. !echo Hello World) for prefix "!", command "echo",
-// numArgs 0 will give input "Hello World".
-// 1. The arguments provided. (eg. !echoNTimes 5, "Hello World") for prefix "!",
-// command "echoNTimes", numArgs 1 will give input "Hello World" and args ["5"]
-func (p *Plugin) parse(m *Message) (string, []string) {
+// Parse the message. Returns the arguments provided to the message:
+func (p *Plugin) parse(m *Message) []string {
 	submatches := p.Prefix.FindStringSubmatch(m.Message)
 
 	switch p.NumArgs {
 	case 0:
-		return "", nil
-	case 1:
-		return strings.TrimSpace(submatches[3]), nil
+		return []string{}
 	default:
-		return submatches[3], submatches[4:]
+		return submatches[3:]
 	}
 }
 
-// Starts a loop in its own goroutine looking for events.
+// Starts a loop in its own goroutine listening for events.
 func (p *Plugin) Listen() {
 	go func() {
 		for {
 			select {
 			case m := <-*p.Bot.PluginChatChannels[p.Name]:
 				if p.match(m) {
-					input, args := p.parse(m)
-					Debug(&Log, fmt.Sprintf("[on plugin] Starting chat event handler goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
+					args := p.parse(m)
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting chat event handler goroutine for plugin `%s` with args `%+v`", p.Name, args))
 					if m.Time.Sub(p.LastUsed) > p.Cooldown {
 						p.LastUsed = m.Time
-						go p.EventHandler.HandleEvent(m, input, args, false)
+						go p.EventHandler.HandleEvent(m, args)
 					}
 				}
 			case m := <-*p.Bot.PluginPrivateChannels[p.Name]:
 				if p.match(m) {
-					input, args := p.parse(m)
-					Debug(&Log, fmt.Sprintf("[on plugin] Starting private event handler goroutine for plugin `%s` with input `%s` and args `%+v`", p.Name, input, args))
+					args := p.parse(m)
+					Debug(&Log, fmt.Sprintf("[on plugin] Starting private event handler goroutine for plugin `%s` with args `%+v`", p.Name, args))
 					if m.Time.Sub(p.LastUsed) > p.Cooldown {
 						p.LastUsed = m.Time
-						go p.EventHandler.HandleEvent(m, input, args, true)
+						go p.EventHandler.HandleEvent(m, args)
 					}
 				}
 			}
