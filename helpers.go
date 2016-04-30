@@ -15,8 +15,7 @@ import (
 // mind that Pokemon Showdown usernames are _not_ case sensitive, so a
 // downcased and sanitized username is a unique identifier.
 func Sanitize(s string) string {
-	reg, err := regexp.Compile("[^A-Za-z0-9]")
-	CheckErr(err)
+	reg := regexp.MustCompile("[^A-Za-z0-9]")
 
 	return strings.ToLower(reg.ReplaceAllString(s, ""))
 }

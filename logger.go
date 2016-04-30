@@ -1,19 +1,20 @@
 package sdbot
 
 import (
+	"fmt"
 	"io"
 	"sync"
 )
 
 const (
-	LevelDebug    = 0
-	LevelLog      = 1
-	LevelIncoming = 10
-	LevelOutgoing = 11
-	LevelInfo     = 2
-	LevelWarn     = 3
-	LevelError    = 4
-	LevelFatal    = 5
+	LevelDebug = iota
+	LevelLog
+	LevelIncoming
+	LevelOutgoing
+	LevelInfo
+	LevelWarn
+	LevelError
+	LevelFatal
 )
 
 type AnyLogger struct {
@@ -57,6 +58,36 @@ func Incoming(lo *Logger, s string) {
 
 func Outgoing(lo *Logger, s string) {
 	log(lo, s, LevelOutgoing)
+}
+
+// fmt.Sprintf shortcuts for convenience and so that the fmt package need not
+// be imported where not needed.
+func Debugf(lo *Logger, format string, a ...interface{}) {
+	log(lo, fmt.Sprintf(format, a...), LevelDebug)
+}
+
+func Infof(lo *Logger, format string, a ...interface{}) {
+	log(lo, fmt.Sprintf(format, a...), LevelInfo)
+}
+
+func Warnf(lo *Logger, format string, a ...interface{}) {
+	log(lo, fmt.Sprintf(format, a...), LevelWarn)
+}
+
+func Errorf(lo *Logger, format string, a ...interface{}) {
+	log(lo, fmt.Sprintf(format, a...), LevelError)
+}
+
+func Fatalf(lo *Logger, format string, a ...interface{}) {
+	log(lo, fmt.Sprintf(format, a...), LevelFatal)
+}
+
+func Incomingf(lo *Logger, format string, a ...interface{}) {
+	log(lo, fmt.Sprintf(format, a...), LevelIncoming)
+}
+
+func Outgoingf(lo *Logger, format string, a ...interface{}) {
+	log(lo, fmt.Sprintf(format, a...), LevelOutgoing)
 }
 
 func log(lo *Logger, s string, i int) {

@@ -39,8 +39,9 @@ import (
 
 func main() {
   b := sdbot.NewBot()
-  b.RegisterPlugin(plugins.HelloWorldPlugin(b), "hello world")
-  b.RegisterPlugin(plugins.EchoPlugin(b), "echo")
+  b.RegisterPlugin(plugins.HelloWorldPlugin(), "hello world")
+  b.RegisterPlugin(plugins.EchoPlugin(), "echo")
+  b.RegisterTimedPlugin(plugins.CountPlugin(), "count")
   b.Connection.Connect()
 }
 ```

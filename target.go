@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// String values of all the auth levels.
 const (
 	Administrator = `~`
 	Leader        = `&`

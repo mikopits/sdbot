@@ -104,6 +104,8 @@ func (c *Connection) startSending() {
 			}
 			select {
 			case <-done:
+				c.Bot.UnregisterPlugins()
+				c.Bot.StopTimedPlugins()
 				os.Exit(15)
 			case <-time.After(time.Second):
 				os.Exit(15)

@@ -3,7 +3,6 @@ package sdbot
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -16,6 +15,7 @@ const (
 	LoginURL = "https://play.pokemonshowdown.com/action.php"
 )
 
+// TODO Move this to Bot.Loggers
 var Log Logger
 
 // The Bot struct is the entrypoint to all the necessary behaviour of the bot.
@@ -33,9 +33,12 @@ type Bot struct {
 	TimedPlugins          []*TimedPlugin
 	PluginChatChannels    map[string]*chan *Message
 	PluginPrivateChannels map[string]*chan *Message
+	Callback              *Callback
+	Loggers               []Logger
+	BattleFormats         []string
+	RecentBattles         chan *RecentBattles
 	mutex                 sync.Mutex
 	semaphores            map[string]*sync.Mutex
-	Callback              *Callback
 }
 
 // Creates a new bot instance.
@@ -49,6 +52,7 @@ func NewBot() *Bot {
 		PluginChatChannels:    make(map[string]*chan *Message, 64),
 		PluginPrivateChannels: make(map[string]*chan *Message, 64),
 		semaphores:            make(map[string]*sync.Mutex),
+		RecentBattles:         make(chan *RecentBattles, 1),
 	}
 	b.Nick = b.Config.Nick
 	b.Connection = &Connection{
@@ -59,6 +63,13 @@ func NewBot() *Bot {
 	b.Callback = &Callback{Bot: b}
 	Log = &PrettyLogger{AnyLogger{Output: os.Stderr}}
 	return b
+}
+
+// TODO Refactor the logging system to log to every logger in Bot.Loggers
+// whenever a log function is called. Allows for custom loggers with file
+// outputs.
+func (b *Bot) AddLogger(lo Logger) {
+	b.Loggers = append(b.Loggers, lo)
 }
 
 // Connects to the Pokemon Showdown server.
@@ -82,16 +93,12 @@ func (b *Bot) Login(msg *Message) {
 			"challenge":      {msg.Params[1]},
 		})
 	}
-	if err != nil {
-		Error(&Log, err)
-	}
+	CheckErr(err)
 
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		Error(&Log, err)
-	}
+	CheckErr(err)
 
 	if b.Config.Password == "" {
 		b.Connection.QueueMessage(strings.Join([]string{"/trn ", b.Config.Nick, ",0,", string(body)}, ""))
@@ -101,9 +108,7 @@ func (b *Bot) Login(msg *Message) {
 		}
 		data := LoginDetails{}
 		err = json.Unmarshal(body[1:], &data)
-		if err != nil {
-			Error(&Log, err)
-		}
+		CheckErr(err)
 
 		b.Connection.QueueMessage(strings.Join([]string{"|/trn ", b.Config.Nick, ",0,", data.Assertion}, ""))
 	}
@@ -169,7 +174,7 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 		}
 
 		p.FormatPrefixAndSuffix()
-		Debug(&Log, fmt.Sprintf("[on bot] Registering plugin `%s` listening on `%v` and `%v`", name, p.Prefix, p.Suffix))
+		Debugf(&Log, "[on bot] Registering plugin `%s` listening on prefix `%v` and suffix `%v`", name, p.Prefix, p.Suffix)
 
 		chatChannel := make(chan *Message, 64)
 		privateChannel := make(chan *Message, 64)
@@ -187,34 +192,35 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 func (b *Bot) RegisterPlugins(plugins map[string]*Plugin) error {
 	for name, p := range plugins {
 		err := b.RegisterPlugin(p, name)
-		if err != nil {
-			return err
-		}
+		CheckErr(err)
 	}
 	return nil
 }
 
-// Register a timed plugin
-// Return false if the plugin has already been registered.
-// Return true if the plugin is successfully registered.
-// TODO update for new plugin structure
-func (b *Bot) RegisterTimedPlugin(tp *TimedPlugin) bool {
+// Registers a timed plugin under the provided name. Timed plugins are not
+// Started until the bot is logged in.
+func (b *Bot) RegisterTimedPlugin(tp *TimedPlugin, name string) error {
 	for _, plugin := range b.TimedPlugins {
-		if plugin == tp {
-			return false
+		if plugin.Name == tp.Name {
+			Error(&Log, ErrPluginNameAlreadyRegistered)
+			return ErrPluginNameAlreadyRegistered
 		}
 	}
+	Debugf(&Log, "[on bot] Registering timed plugin `%s` with period `%f`", name, tp.Period)
 	tp.Bot = b
 	b.TimedPlugins = append(b.TimedPlugins, tp)
-	return true
+	return nil
 }
 
 // Unregister a plugin.
 // Returns true if the plugin was successfully unregistered.
-// TODO update for new plugin structure
 func (b *Bot) UnregisterPlugin(p *Plugin) bool {
 	for i, plugin := range b.Plugins {
 		if plugin == p {
+			Debugf(&Log, "[on bot] Unregistering plugin `%s`", p.Name)
+			p.StopListening()
+			delete(b.PluginChatChannels, p.Name)
+			delete(b.PluginPrivateChannels, p.Name)
 			b.Plugins = append(b.Plugins[:i], b.Plugins[i+1:]...)
 			return true
 		}
@@ -222,12 +228,20 @@ func (b *Bot) UnregisterPlugin(p *Plugin) bool {
 	return false
 }
 
+// Unregister all plugins.
+func (b *Bot) UnregisterPlugins() {
+	for _, plugin := range b.Plugins {
+		b.UnregisterPlugin(plugin)
+	}
+}
+
 // Unregister a timed plugin.
-// Returns true if the plugins was successfully unregistered.
-// TODO update for new plugin structure
+// Returns true if the plugin was successfully unregistered.
 func (b *Bot) UnregisterTimedPlugin(tp *TimedPlugin) bool {
 	for i, plugin := range b.TimedPlugins {
-		if plugin == tp {
+		if plugin.Name == tp.Name {
+			Debugf(&Log, "[on bot] Unregistering timed plugin `%s`", tp.Name)
+			tp.Stop()
 			b.TimedPlugins = append(b.TimedPlugins[:i], b.TimedPlugins[i+1:]...)
 			return true
 		}
@@ -238,14 +252,14 @@ func (b *Bot) UnregisterTimedPlugin(tp *TimedPlugin) bool {
 // Start all registered TimedPlugins
 func (b *Bot) StartTimedPlugins() {
 	for _, tp := range b.TimedPlugins {
-		tp.TimedEventHandler.Start()
+		tp.Start()
 	}
 }
 
 // Stop all registered TimedPlugins
 func (b *Bot) StopTimedPlugins() {
 	for _, tp := range b.TimedPlugins {
-		tp.TimedEventHandler.Stop()
+		tp.Stop()
 	}
 }
 
@@ -255,6 +269,13 @@ func (b *Bot) StopTimedPlugins() {
 // the same time. So you should run such commands under Bot.Synchronize.
 // The name is an arbitrary name you can choose for your mutex. The lambda is
 // Then run in the mutex defined by the name. Choose unique names!
+//
+// Example:
+// var doUnsafeAction = func() interface{} {
+//   // Some action that must be performed sequentially.
+//   return nil
+// }
+// bot.Synchronize("uniqueIdentifierForUnsafeAction", &doUnsafeAction)
 func (b *Bot) Synchronize(name string, lambda *func() interface{}) interface{} {
 	b.mutex.Lock()
 	_, exists := b.semaphores[name]

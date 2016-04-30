@@ -1,28 +1,32 @@
 package sdbot
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Define function handlers to call depending on the command we get.
 var Handlers = map[string]interface{}{
-	"challstr":   onChallstr,
-	"updateuser": onUpdateuser,
-	"l":          onLeave,
-	"j":          onJoin,
-	"n":          onNick,
-	"init":       onInit,
-	"deinit":     onDeinit,
-	"users":      onUsers,
-	"popup":      onPopup,
-	"c:":         onChat,
-	"pm":         onPrivateMessage,
-	"tournament": onTournament,
+	"challstr":      onChallstr,
+	"updateuser":    onUpdateuser,
+	"l":             onLeave,
+	"j":             onJoin,
+	"n":             onNick,
+	"init":          onInit,
+	"deinit":        onDeinit,
+	"users":         onUsers,
+	"popup":         onPopup,
+	"c:":            onChat,
+	"pm":            onPrivateMessage,
+	"tournament":    onTournament,
+	"formats":       onFormats,
+	"queryresponse": onQueryResponse,
 }
 
 // Uses reflection to call a handler if it exists for the given command
@@ -50,6 +54,7 @@ func onChallstr(msg *Message, events chan string) {
 }
 
 var AvatarSet bool = false
+var once sync.Once
 
 func onUpdateuser(msg *Message, events chan string) {
 	switch msg.Params[1] {
@@ -63,6 +68,8 @@ func onUpdateuser(msg *Message, events chan string) {
 			room := FindRoomEnsured(r, msg.Bot)
 			msg.Bot.JoinRoom(room)
 		}
+		// We have successfully logged in, start TimedPlugins.
+		once.Do(func() { msg.Bot.StartTimedPlugins() })
 	}
 }
 
@@ -129,6 +136,10 @@ func onUsers(msg *Message, events chan string) {
 }
 
 func onPopup(msg *Message, events chan string) {
+	if len(msg.Params) < 3 {
+		return
+	}
+
 	// Handle bans
 	if strings.Contains(msg.Params[2], "has banned you from the room") {
 		reg, err := regexp.Compile("(?P<user>[^ ]+) has banned you from the room (?P<room>[^ ]*).</p><p>To appeal")
@@ -181,5 +192,45 @@ func onTournament(msg *Message, events chan string) {
 		fallthrough
 	case "start":
 		events <- "tour"
+	}
+}
+
+// Parse and store the current battle formats in Bot.BattleFormats
+func onFormats(msg *Message, events chan string) {
+	formatsStr := "|" + strings.Join(msg.Params, "|")
+	formatsStr = regexp.MustCompile("[,#]").ReplaceAllString(formatsStr, "")
+	formatsStr = regexp.MustCompile("\\|[0-9]+\\|[^|]+").ReplaceAllString(formatsStr, "")
+	var formats []string
+	for _, format := range strings.Split(formatsStr, "|") {
+		sanitized := Sanitize(format)
+		if len(sanitized) > 0 {
+			formats = append(formats, sanitized[:len(sanitized)-1])
+		}
+	}
+	//msg.Bot.BattleFormats = formats[1:]
+	// TODO Verify that this does what I want it to.
+	Debugf(&Log, "[on handlers] battle formats: %+v", msg.Bot.BattleFormats)
+}
+
+// Struct to hold the roomlist JSON unmarshalling.
+// TODO Check the output of |/cmd roomlist and verify that this struct will
+// indeed unmarshal the JSON.
+type RecentBattles struct {
+	Battles map[string]BattleInfo
+}
+
+type BattleInfo struct {
+	FirstPlayer  string `json:"p1"`
+	SecondPlayer string `json:"p2"`
+	MinElo       string `json:"minElo"`
+}
+
+func onQueryResponse(msg *Message, events chan string) {
+	// Populate the bot with "roomlist" information.
+	if msg.Params[0] == "roomlist" {
+		var recentBattles RecentBattles
+		err := json.Unmarshal([]byte(msg.Params[1]), &recentBattles)
+		CheckErr(err)
+		msg.Bot.RecentBattles <- &recentBattles
 	}
 }
