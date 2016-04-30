@@ -7,7 +7,8 @@ Description
 SDBot is a bot framework written in Go for Pokemon Showdown designed to take
 advantage of Go's inherent concurrency.
 
-Still in developmental stages.
+Still in developmental stages. This means that the API is still likely to
+change at any time.
 
 Installation
 ------------
