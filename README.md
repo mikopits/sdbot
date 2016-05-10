@@ -4,15 +4,15 @@ SDBot - A Pokemon Showdown Bot Framework
 Description
 -----------
 
-SDBot is a bot framework written in Go for Pokemon Showdown designed to take
+SDBot is a bot framework written in [Go](https://golang.org/) for [Pokemon Showdown](https://pokemonshowdown.com/) designed to take
 advantage of Go's inherent concurrency.
 
-Still in developmental stages. This means that the API is still likely to
-change at any time.
+Still in developmental stages. This means that the API is still likely to change at any time.
 
-[Package API Documentation](https://godoc.org/github.com/mikopits/sdbot)
+### References
 
-[Imported Packages and Dependencies](https://godoc.org/github.com/mikopits/sdbot?imports)
+*[API Documentation](https://godoc.org/github.com/mikopits/sdbot)
+*[Dependencies](https://godoc.org/github.com/mikopits/sdbot?imports)
 
 Installation
 ------------
@@ -51,5 +51,4 @@ func main() {
 }
 ```
 
-And be sure to set your `config.toml` file in the same directory as
-`package main`.
+And be sure to set your `config.toml` file in the same directory (See the [example](https://github.com/mikopits/sdbot/blob/master/examples/config/config_example.toml)).
