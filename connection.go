@@ -109,16 +109,16 @@ func (c *Connection) startSending() {
 			case <-interrupt:
 				Warn("Process was interrupted. Closing connection...")
 
+				// Kill the reading goroutine.
+				c.rk.Kill()
+				c.rk.Wait()
+
 				// Send a close frame and wait for the server to close the connection.
 				err := c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 				if err != nil {
 					Error(err)
 					return
 				}
-
-				// Kill the reading goroutine.
-				c.rk.Kill()
-				c.rk.Wait()
 
 				// Close all plugin goroutines gracefully.
 				var wg sync.WaitGroup
