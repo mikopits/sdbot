@@ -13,6 +13,7 @@ Nick = ""
 Password = ""
 
 # The rate at which the bot will send messages at. Recommended value is 3.
+# If this is not set then it will default to 3.
 MessagesPerSecond = 3.0
 
 # The rooms the bot will automatically join.
@@ -33,5 +34,5 @@ PluginPrefixes = ["."]
 #PluginSuffixes = ["!"]
 
 # Set to true if you want your matches to be case insensitive.
-# eg. ".echo Hello World" and ".EchO Hello World" will both trigger and event.
+# eg. ".echo Hello World" and ".EchO Hello World" will both trigger an event.
 CaseInsensitive = true

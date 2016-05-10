@@ -19,7 +19,7 @@ const (
 
 type AnyLogger struct {
 	Output io.Writer
-	mutex  sync.Mutex // Safely access the logger concurrently
+	mutex  sync.Mutex
 }
 
 func (lo *AnyLogger) GetLogger() *AnyLogger {
@@ -43,8 +43,8 @@ func Warn(lo *Logger, s string) {
 	log(lo, s, LevelWarn)
 }
 
-func Error(lo *Logger, e error) {
-	log(lo, e.Error(), LevelError)
+func Error(lo *Logger, err error) {
+	log(lo, err.Error(), LevelError)
 }
 
 func Fatal(lo *Logger, s string) {

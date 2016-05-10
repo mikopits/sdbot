@@ -15,8 +15,9 @@ const (
 	LoginURL = "https://play.pokemonshowdown.com/action.php"
 )
 
-// TODO Move this to Bot.Loggers
+// TODO Complete LoggerList functionality.
 var Log Logger
+var ActiveLoggers *LoggerList
 
 // The Bot struct is the entrypoint to all the necessary behaviour of the bot.
 // The bot runs its handlers in separate goroutines, so an API is provided to
@@ -33,11 +34,11 @@ type Bot struct {
 	TimedPlugins          []*TimedPlugin
 	PluginChatChannels    map[string]*chan *Message
 	PluginPrivateChannels map[string]*chan *Message
-	Callback              *Callback
-	Loggers               []Logger
 	BattleFormats         []string
 	RecentBattles         chan *RecentBattles
-	mutex                 sync.Mutex
+	pccMutex              sync.Mutex
+	ppcMutex              sync.Mutex
+	semMutex              sync.Mutex
 	semaphores            map[string]*sync.Mutex
 }
 
@@ -56,24 +57,35 @@ func NewBot() *Bot {
 	}
 	b.Nick = b.Config.Nick
 	b.Connection = &Connection{
-		Bot:       b,
-		Connected: false,
-		outQueue:  make(chan string, 64),
+		Bot:   b,
+		queue: make(chan string, 64),
 	}
-	b.Callback = &Callback{Bot: b}
 	Log = &PrettyLogger{AnyLogger{Output: os.Stderr}}
+	ActiveLoggers = NewLoggerList(&PrettyLogger{AnyLogger{Output: os.Stderr}})
 	return b
 }
 
 // TODO Refactor the logging system to log to every logger in Bot.Loggers
 // whenever a log function is called. Allows for custom loggers with file
 // outputs.
-func (b *Bot) AddLogger(lo Logger) {
-	b.Loggers = append(b.Loggers, lo)
+// Adds a logger.
+func AddLogger(lo Logger) {
+	ActiveLoggers.Loggers = append(ActiveLoggers.Loggers, lo)
+}
+
+// Removes a logger. Returns true if the logger was successfully removed.
+func RemoveLogger(lo Logger) bool {
+	for i, logger := range ActiveLoggers.Loggers {
+		if logger == lo {
+			ActiveLoggers.Loggers = append(ActiveLoggers.Loggers[:i], ActiveLoggers.Loggers[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 // Connects to the Pokemon Showdown server.
-func (b *Bot) Login(msg *Message) {
+func (b *Bot) login(msg *Message) {
 	var res *http.Response
 	var err error
 
@@ -263,6 +275,30 @@ func (b *Bot) StopTimedPlugins() {
 	}
 }
 
+func (b *Bot) pluginChatChannelsWrite(s string, m *Message) {
+	b.pccMutex.Lock()
+	*b.PluginChatChannels[s] <- m
+	b.pccMutex.Unlock()
+}
+
+func (b *Bot) pluginPrivateChannelsWrite(s string, m *Message) {
+	b.ppcMutex.Lock()
+	*b.PluginPrivateChannels[s] <- m
+	b.ppcMutex.Unlock()
+}
+
+func (b *Bot) pluginChatChannelsRead(s string) chan *Message {
+	b.pccMutex.Lock()
+	defer b.pccMutex.Unlock()
+	return *b.PluginChatChannels[s]
+}
+
+func (b *Bot) pluginPrivateChannelsRead(s string) chan *Message {
+	b.ppcMutex.Lock()
+	defer b.ppcMutex.Unlock()
+	return *b.PluginPrivateChannels[s]
+}
+
 // Provides an API to keep your code thread-safe and concurrent.
 // For example, if a plugin is going to write to a file, it would be a bad idea
 // to have multiple threads with different state to try to access the file at
@@ -277,15 +313,20 @@ func (b *Bot) StopTimedPlugins() {
 // }
 // bot.Synchronize("uniqueIdentifierForUnsafeAction", &doUnsafeAction)
 func (b *Bot) Synchronize(name string, lambda *func() interface{}) interface{} {
-	b.mutex.Lock()
+	b.semMutex.Lock()
 	_, exists := b.semaphores[name]
 	if !exists {
 		b.semaphores[name] = &sync.Mutex{}
 	}
 	semaphore := b.semaphores[name]
-	b.mutex.Unlock()
+	b.semMutex.Unlock()
 
 	semaphore.Lock()
 	defer semaphore.Unlock()
 	return (*lambda)()
+}
+
+// Starts the bot and connect to the websocket.
+func (b *Bot) Connect() {
+	b.Connection.connect()
 }

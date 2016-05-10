@@ -9,6 +9,7 @@ const (
 	Administrator = `~`
 	Leader        = `&`
 	RoomOwner     = `#`
+	Moderator     = `@`
 	Driver        = `%`
 	TheImmortal   = `>`
 	Battler       = `★`
@@ -26,9 +27,10 @@ var AuthLevels = map[string]int{
 	Battler:       4,
 	TheImmortal:   5,
 	Driver:        6,
-	RoomOwner:     7,
-	Leader:        8,
-	Administrator: 9,
+	Moderator:     7,
+	RoomOwner:     8,
+	Leader:        9,
+	Administrator: 10,
 }
 
 type User struct {
@@ -50,21 +52,35 @@ func NewUser(name string) *User {
 
 // Responds to a user in private message.
 func (u *User) Reply(m *Message, res string) {
-	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,(%s) %s", u.Name, m.User.Name, res))
+	s := fmt.Sprintf("(%s) %s", m.User.Name, res)
+	if len(s) > 300 {
+		s = s[:300]
+	}
+	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/w %s,%s", u.Name, s))
 }
 
 // Responds to a user in a room.
 func (r *Room) Reply(m *Message, res string) {
-	m.Bot.Connection.QueueMessage(fmt.Sprintf("%s|(%s) %s", r.Name, m.User.Name, res))
+	s := fmt.Sprintf("(%s) %s", m.User.Name, res)
+	if len(s) > 300 {
+		s = s[:300]
+	}
+	m.Bot.Connection.QueueMessage(fmt.Sprintf("%s|%s", r.Name, s))
 }
 
 // Responds to a user in private message without prepending their username.
 func (u *User) RawReply(m *Message, res string) {
-	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/pm %s,%s", u.Name, res))
+	if len(res) > 300 {
+		res = res[:300]
+	}
+	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/w %s,%s", u.Name, res))
 }
 
 // Responds to a user in a room without prepending their username.
 func (r *Room) RawReply(m *Message, res string) {
+	if len(res) > 300 {
+		res = res[:300]
+	}
 	m.Bot.Connection.QueueMessage(fmt.Sprintf("%s|%s", r.Name, res))
 }
 
@@ -132,6 +148,7 @@ func FindRoomEnsured(name string, bot *Bot) *Room {
 	return bot.Synchronize("user", &updateRooms).(*Room)
 }
 
+// TODO Test this. Doesn't seem to work as intended.
 // Renames a user.
 func Rename(old string, s string, bot *Bot) {
 	so := Sanitize(old)

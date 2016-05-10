@@ -12,7 +12,7 @@ import (
 )
 
 // Define function handlers to call depending on the command we get.
-var Handlers = map[string]interface{}{
+var handlers = map[string]interface{}{
 	"challstr":      onChallstr,
 	"updateuser":    onUpdateuser,
 	"l":             onLeave,
@@ -30,7 +30,7 @@ var Handlers = map[string]interface{}{
 }
 
 // Uses reflection to call a handler if it exists for the given command
-func CallHandler(m map[string]interface{}, name string, params ...interface{}) (result []reflect.Value, err error) {
+func callHandler(m map[string]interface{}, name string, params ...interface{}) (result []reflect.Value, err error) {
 	f := reflect.ValueOf(m[name])
 	if !f.IsValid() {
 		return
@@ -48,15 +48,15 @@ func CallHandler(m map[string]interface{}, name string, params ...interface{}) (
 	return
 }
 
-func onChallstr(msg *Message, events chan string) {
+func onChallstr(msg *Message) {
 	Info(&Log, "Attempting to log in...")
-	msg.Bot.Login(msg)
+	msg.Bot.login(msg)
 }
 
 var AvatarSet bool = false
 var once sync.Once
 
-func onUpdateuser(msg *Message, events chan string) {
+func onUpdateuser(msg *Message) {
 	switch msg.Params[1] {
 	case "0":
 		if msg.Bot.Config.Avatar > 0 && msg.Bot.Config.Avatar <= 294 {
@@ -73,20 +73,21 @@ func onUpdateuser(msg *Message, events chan string) {
 	}
 }
 
-func onLeave(msg *Message, events chan string) {
+func onLeave(msg *Message) {
+	FindRoomEnsured(msg.Room.Name, msg.Bot).RemoveUser(msg.User.Name)
 	delete(msg.Bot.UserList, Sanitize(msg.User.Name))
 }
 
-func onJoin(msg *Message, events chan string) {
+func onJoin(msg *Message) {
 	if msg.User.Name == msg.Bot.Nick {
-		onInit(msg, events)
+		onInit(msg)
 	}
 
 	FindUserEnsured(msg.User.Name, msg.Bot).AddAuth(msg.Room.Name, msg.Auth)
 	FindRoomEnsured(msg.Room.Name, msg.Bot).AddUser(msg.User.Name)
 }
 
-func onNick(msg *Message, events chan string) {
+func onNick(msg *Message) {
 	oldNick := Sanitize(msg.Params[0])
 	if oldNick == Sanitize(msg.Bot.Nick) {
 		msg.Bot.Nick = msg.User.Name
@@ -95,7 +96,7 @@ func onNick(msg *Message, events chan string) {
 	}
 }
 
-func onInit(msg *Message, events chan string) {
+func onInit(msg *Message) {
 	// This may occur if the bot is redirected. Leave the room if it
 	// is not a room it should be in, and try to rejoin any rooms that
 	// it should be in.
@@ -122,11 +123,11 @@ func includes(a []string, s string) bool {
 	return false
 }
 
-func onDeinit(msg *Message, events chan string) {
+func onDeinit(msg *Message) {
 	// TODO Attempt to rejoin? Does the state need to be updated?
 }
 
-func onUsers(msg *Message, events chan string) {
+func onUsers(msg *Message) {
 	// Populate the room with its users and their auth levels.
 	for _, user := range strings.Split(msg.Params[0], ",")[1:] {
 		auth, nick := string(user[0]), user[1:]
@@ -135,7 +136,7 @@ func onUsers(msg *Message, events chan string) {
 	}
 }
 
-func onPopup(msg *Message, events chan string) {
+func onPopup(msg *Message) {
 	if len(msg.Params) < 3 {
 		return
 	}
@@ -155,48 +156,36 @@ func onPopup(msg *Message, events chan string) {
 		}
 		user, room := result["user"], result["room"]
 		Warn(&Log, "You have been banned from the room "+room+" by the user "+user)
-		// TODO: This is a lazy solution, but the server no longer notifies you when
+		// This is a lazy solution, but the server no longer notifies you when
 		// you are unbanned. Try to rejoin after a potential kick.
 		time.Sleep(time.Second)
 		msg.Bot.JoinRoom(&Room{Name: room})
 	}
 }
 
-func onChat(msg *Message, events chan string) {
+func onChat(msg *Message) {
 	if LoginTime == 0 {
 		return
 	}
 	if msg.Message != "" && msg.Timestamp >= LoginTime {
-		events <- "message"
-		for _, channel := range msg.Bot.PluginChatChannels {
-			*channel <- msg
+		for name, _ := range msg.Bot.PluginChatChannels {
+			msg.Bot.pluginChatChannelsWrite(name, msg)
 		}
 	}
 }
 
-func onPrivateMessage(msg *Message, events chan string) {
-	events <- "private"
-	for _, channel := range msg.Bot.PluginPrivateChannels {
-		*channel <- msg
+func onPrivateMessage(msg *Message) {
+	for name, _ := range msg.Bot.PluginPrivateChannels {
+		msg.Bot.pluginPrivateChannelsWrite(name, msg)
 	}
 }
 
-func onTournament(msg *Message, events chan string) {
-	// Tournaments are very noisy and send a lot of information we don't need,
-	// only want to listen to tournament create, update, and start events. You
-	// can still use the "tournament" event for other purposes.
-	switch msg.Params[0] {
-	case "create":
-		fallthrough
-	case "update":
-		fallthrough
-	case "start":
-		events <- "tour"
-	}
+func onTournament(msg *Message) {
+	// TODO
 }
 
 // Parse and store the current battle formats in Bot.BattleFormats
-func onFormats(msg *Message, events chan string) {
+func onFormats(msg *Message) {
 	formatsStr := "|" + strings.Join(msg.Params, "|")
 	formatsStr = regexp.MustCompile("[,#]").ReplaceAllString(formatsStr, "")
 	formatsStr = regexp.MustCompile("\\|[0-9]+\\|[^|]+").ReplaceAllString(formatsStr, "")
@@ -225,7 +214,7 @@ type BattleInfo struct {
 	MinElo       string `json:"minElo"`
 }
 
-func onQueryResponse(msg *Message, events chan string) {
+func onQueryResponse(msg *Message) {
 	// Populate the bot with "roomlist" information.
 	if msg.Params[0] == "roomlist" {
 		var recentBattles RecentBattles

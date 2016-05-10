@@ -34,6 +34,7 @@ import (
 	"sync"
 )
 
+// Killables are used to control the termination of goroutines.
 type Killable struct {
 	mutex sync.Mutex
 	dying chan struct{}

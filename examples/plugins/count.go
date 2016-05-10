@@ -11,6 +11,7 @@ import (
 var CountPlugin = func() *sdbot.TimedPlugin {
 	tp := sdbot.NewTimedPlugin(time.Second * 5)
 	tp.SetEventHandler(&CountEventHandler{TimedPlugin: tp})
+	return tp
 }
 
 type CountEventHandler struct {

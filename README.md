@@ -19,10 +19,10 @@ You can `go get` it.
 go get github.com/mikopits/sdbot
 ```
 
-Or you can clone the latest GitHub repository.
+To install/update the package dependencies:
 
 ```
-git clone http://github.com/mikopits/sdbot
+go get -u -v github.com/mikopits/sdbot
 ```
 
 Example
@@ -43,7 +43,7 @@ func main() {
   b.RegisterPlugin(plugins.HelloWorldPlugin(), "hello world")
   b.RegisterPlugin(plugins.EchoPlugin(), "echo")
   b.RegisterTimedPlugin(plugins.CountPlugin(), "count")
-  b.Connection.Connect()
+  b.Connect()
 }
 ```
 

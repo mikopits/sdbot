@@ -20,11 +20,22 @@ func Sanitize(s string) string {
 	return strings.ToLower(reg.ReplaceAllString(s, ""))
 }
 
-// Public API for errorchecking.
+// Public API for errorchecking. Logs to only os.Stderr.
 func CheckErr(err error) {
 	if err != nil {
 		Error(&Log, err)
 	}
+}
+
+// Public API for errorchecking. Logs to every logger in ActiveLoggers.
+func CheckErrAll(err error) {
+	if err != nil {
+		ErrorAll(ActiveLoggers, err)
+	}
+}
+
+func Inspect(i interface{}) {
+	Debugf(&Log, "%+v", i)
 }
 
 type HasteKey struct {

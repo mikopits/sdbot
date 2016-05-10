@@ -1,7 +1,6 @@
 package sdbot
 
 import (
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -9,19 +8,22 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// Config holds the configuration information read from the config.toml file.
 type Config struct {
-	Server            string
-	Port              string
-	Nick              string
-	Password          string
-	MessagesPerSecond float64
-	Rooms             []string
-	Avatar            int
-	PluginPrefixes    []string
-	PluginSuffixes    []string
-	PluginPrefix      *regexp.Regexp
-	PluginSuffix      *regexp.Regexp
-	CaseInsensitive   bool
+	Server                string
+	Port                  string
+	Nick                  string
+	Password              string
+	MessagesPerSecond     float64
+	Rooms                 []string
+	Avatar                int
+	PluginPrefixes        []string
+	PluginSuffixes        []string
+	PluginPrefix          *regexp.Regexp
+	PluginSuffix          *regexp.Regexp
+	CaseInsensitive       bool
+	IgnorePrivateMessages bool
+	IgnoreChatMessages    bool
 }
 
 // Reads the config data from toml config file.
@@ -29,36 +31,43 @@ func ReadConfig() *Config {
 	configfile := "config.toml"
 	_, err := os.Stat(configfile)
 	if err != nil {
-		Fatal(&Log, fmt.Sprintf("Config file is missing: %s", configfile))
+		Fatalf(&Log, "Config file is missing: %s", configfile)
 	}
 
 	var config Config
-	if _, err := toml.DecodeFile(configfile, &config); err != nil {
-		Error(&Log, err)
-	}
+	_, err = toml.DecodeFile(configfile, &config)
+	CheckErr(err)
 
 	config.generatePluginPrefixRegexp()
 	config.generatePluginSuffixRegexp()
+
+	if config.MessagesPerSecond == 0 {
+		config.MessagesPerSecond = 3
+	}
 
 	return &config
 }
 
 func (c *Config) generatePluginPrefixRegexp() {
-	regStr := "^(" + strings.Join(c.PluginPrefixes, "|") + ")"
-	reg, err := regexp.Compile(regStr)
-	if err != nil {
-		Error(&Log, err)
+	var prefixes []string
+	for _, prefix := range c.PluginPrefixes {
+		prefixes = append(prefixes, regexp.QuoteMeta(prefix))
 	}
+	regStr := "^(" + strings.Join(prefixes, "|") + ")"
+	reg, err := regexp.Compile(regStr)
+	CheckErr(err)
 
 	c.PluginPrefix = reg
 }
 
 func (c *Config) generatePluginSuffixRegexp() {
-	regStr := "(" + strings.Join(c.PluginSuffixes, "|") + ")$"
-	reg, err := regexp.Compile(regStr)
-	if err != nil {
-		Error(&Log, err)
+	var suffixes []string
+	for _, suffix := range c.PluginSuffixes {
+		suffixes = append(suffixes, regexp.QuoteMeta(suffix))
 	}
+	regStr := "(" + strings.Join(suffixes, "|") + ")$"
+	reg, err := regexp.Compile(regStr)
+	CheckErr(err)
 
 	c.PluginSuffix = reg
 }

@@ -3,22 +3,23 @@ package sdbot
 import (
 	"bytes"
 	"fmt"
-	//"runtime/debug"
 	"strings"
 	"time"
 )
 
 const (
-	Reset   string = "\x1b[0m"
-	Bold    string = "\x1b[1m"
-	Red     string = "\x1b[31m"
-	Green   string = "\x1b[32m"
-	Yellow  string = "\x1b[33m"
-	Blue    string = "\x1b[34m"
-	Black   string = "\x1b[30m"
-	BgWhite string = "\x1b[47m"
+	reset   string = "\x1b[0m"
+	bold    string = "\x1b[1m"
+	red     string = "\x1b[31m"
+	green   string = "\x1b[32m"
+	yellow  string = "\x1b[33m"
+	blue    string = "\x1b[34m"
+	black   string = "\x1b[30m"
+	bgWhite string = "\x1b[47m"
 )
 
+// Logs everything with pretty colours. Looks good with the Solarized terminal theme.
+// Don't like how it looks? Make your own!
 type PrettyLogger struct {
 	AnyLogger
 }
@@ -43,7 +44,7 @@ func (lo *PrettyLogger) formatMessage(s string, level int) string {
 }
 
 func formatDebug(s string) string {
-	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", Yellow), s)
+	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", yellow), s)
 }
 
 func formatInfo(s string) string {
@@ -51,9 +52,7 @@ func formatInfo(s string) string {
 }
 
 func formatError(s string) string {
-	//debug.SetTraceback("single")
-	//debug.PrintStack()
-	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", Red), s)
+	return fmt.Sprintf("%s %s %s\n", timestamp(), colourize("!!", red), s)
 }
 
 func formatGeneral(s string) string {
@@ -69,26 +68,30 @@ func formatIncoming(s string) string {
 	rest := split[1]
 
 	parts := strings.Split(rest, "|")
-	prefix := colourize(">>", Green)
+	prefix := colourize(">>", green)
 
 	if room == "" {
 		// Private messages
-		parts = parts[1:]
-		return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, colourize(parts[0], Blue), strings.Join(parts[1:], "|"))
+		if len(parts) > 1 {
+			parts = parts[1:]
+			return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, colourize(parts[0], blue), strings.Join(parts[1:], "|"))
+		} else {
+			return fmt.Sprintf("%s %s %s\n", timestamp(), prefix, parts[0])
+		}
 	}
 
-	room = colourize(room[1:], Bold)
+	room = colourize(room[1:], bold)
 
 	if len(parts) == 0 {
 		return fmt.Sprintf("%s %s %s\n", timestamp(), prefix, room)
 	}
 
 	if len(parts) == 1 {
-		// Raw server messages
-		return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, room, colourize(parts[0], Red))
+		// Raw server messages/ban messages
+		return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, room, colourize(parts[0], bold))
 	}
 
-	cmd := colourize(parts[1], Blue)
+	cmd := colourize(parts[1], blue)
 	params := strings.Join(parts[2:], "|")
 
 	return fmt.Sprintf("%s %s %s|%s|%s\n", timestamp(), prefix, room, cmd, params)
@@ -96,9 +99,9 @@ func formatIncoming(s string) string {
 
 func formatOutgoing(s string) string {
 	split := strings.Split(s, "|")
-	room := colourize(split[0], Bold)
+	room := colourize(split[0], bold)
 	rest := split[1]
-	prefix := colourize("<<", Red)
+	prefix := colourize("<<", red)
 
 	return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, room, rest)
 }
@@ -113,5 +116,5 @@ func colourize(s string, codes ...string) string {
 		buffer.WriteString(code)
 	}
 
-	return strings.Join([]string{buffer.String(), s, Reset}, "")
+	return strings.Join([]string{buffer.String(), s, reset}, "")
 }
