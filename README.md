@@ -1,6 +1,9 @@
 SDBot - A Pokemon Showdown Bot Framework
 ==========================================
 
+[![GoDoc](https://godoc.org/github.com/mikopits/sdbot?status.svg)](https://godoc.org/github.com/mikopits/sdbot)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mikopits/sdbot)](https://goreportcard.com/report/github.com/mikopits/sdbot)
+
 Description
 -----------
 
@@ -9,10 +12,7 @@ advantage of Go's inherent concurrency.
 
 Still in developmental stages. This means that the API is still likely to change at any time.
 
-### References
-
-*[API Documentation](https://godoc.org/github.com/mikopits/sdbot)
-*[Dependencies](https://godoc.org/github.com/mikopits/sdbot?imports)
+SDBot has the following [Dependencies](https://godoc.org/github.com/mikopits/sdbot?imports).
 
 Installation
 ------------
