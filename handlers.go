@@ -54,7 +54,7 @@ func onChallstr(m *Message) {
 }
 
 // AvatarSet is true if we have set the avater, and false otherwise.
-var AvatarSet bool = false
+var AvatarSet bool
 var once sync.Once
 
 func onUpdateuser(m *Message) {
@@ -169,14 +169,14 @@ func onChat(m *Message) {
 		return
 	}
 	if m.Message != "" && m.Timestamp >= LoginTime[m.Room.Name] {
-		for name, _ := range m.Bot.PluginChatChannels {
+		for name := range m.Bot.PluginChatChannels {
 			m.Bot.pluginChatChannelsWrite(name, m)
 		}
 	}
 }
 
 func onPrivateMessage(m *Message) {
-	for name, _ := range m.Bot.PluginPrivateChannels {
+	for name := range m.Bot.PluginPrivateChannels {
 		m.Bot.pluginPrivateChannelsWrite(name, m)
 	}
 }

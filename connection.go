@@ -15,7 +15,7 @@ import (
 )
 
 // LoginTime contains the unix login times as values to each particular room
-// the bot has joined. This allows us to ignore messages that occured before
+// the bot has joined. This allows us to ignore messages that occurred before
 // the bot has logged in.
 var LoginTime map[string]int
 

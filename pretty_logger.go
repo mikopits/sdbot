@@ -77,9 +77,8 @@ func formatIncoming(s string) string {
 		if len(parts) > 1 {
 			parts = parts[1:]
 			return fmt.Sprintf("%s %s %s|%s\n", timestamp(), prefix, colourize(parts[0], blue), strings.Join(parts[1:], "|"))
-		} else {
-			return fmt.Sprintf("%s %s %s\n", timestamp(), prefix, parts[0])
 		}
+		return fmt.Sprintf("%s %s %s\n", timestamp(), prefix, parts[0])
 	}
 
 	room = colourize(room[1:], bold)

@@ -134,7 +134,12 @@ func (b *Bot) LeaveRoom(room *Room) {
 	b.Connection.QueueMessage("|/leave " + room.Name)
 }
 
+// ErrPluginAlreadyRegisted is returned whenever a plugin with a particular name
+// is attempted to be registered, but the name has previously been registered.
 var ErrPluginNameAlreadyRegistered = errors.New("sdbot: plugin name was already in use (register under another name)")
+
+// ErrPluginAlreadyRegistered is returned whenever the same plugin is attempted
+// to be registered twice.
 var ErrPluginAlreadyRegistered = errors.New("sdbot: plugin was already registered")
 
 // RegisterPlugin registers a plugin under a name and starts listening on its event handler.
@@ -149,26 +154,26 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 	if b.PluginChatChannels[name] != nil {
 		Error(ErrPluginNameAlreadyRegistered)
 		return ErrPluginNameAlreadyRegistered
-	} else {
-		p.Bot = b
-		p.Name = name
-
-		// Load prefix and suffix from the config if none were provided.
-		if p.Prefix == nil {
-			p.Prefix = b.Config.PluginPrefix
-		}
-		if p.Suffix == nil {
-			p.Suffix = b.Config.PluginSuffix
-		}
-
-		p.formatPrefixAndSuffix()
-		Debugf("[on bot] Registering plugin `%s` listening on prefix `%v` and suffix `%v`", name, p.Prefix, p.Suffix)
-
-		chatChannel := make(chan *Message, 64)
-		privateChannel := make(chan *Message, 64)
-		b.PluginChatChannels[name] = &chatChannel
-		b.PluginPrivateChannels[name] = &privateChannel
 	}
+
+	p.Bot = b
+	p.Name = name
+
+	// Load prefix and suffix from the config if none were provided.
+	if p.Prefix == nil {
+		p.Prefix = b.Config.PluginPrefix
+	}
+	if p.Suffix == nil {
+		p.Suffix = b.Config.PluginSuffix
+	}
+
+	p.formatPrefixAndSuffix()
+	Debugf("[on bot] Registering plugin `%s` listening on prefix `%v` and suffix `%v`", name, p.Prefix, p.Suffix)
+
+	chatChannel := make(chan *Message, 64)
+	privateChannel := make(chan *Message, 64)
+	b.PluginChatChannels[name] = &chatChannel
+	b.PluginPrivateChannels[name] = &privateChannel
 
 	b.Plugins = append(b.Plugins, p)
 	p.listen()
