@@ -1,5 +1,6 @@
 // Sample timed plugin for sdbot.
 // +build ignore
+
 package sdbot
 
 import (

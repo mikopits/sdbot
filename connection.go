@@ -14,10 +14,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var LoginTime int
+// LoginTime contains the unix login times as values to each particular room
+// the bot has joined. This allows us to ignore messages that occured before
+// the bot has logged in.
+var LoginTime map[string]int
 
 var interrupt chan os.Signal
 
+// Connection represents the connection to the websocket.
 type Connection struct {
 	Bot       *Bot
 	Connected bool
@@ -31,7 +35,7 @@ type Connection struct {
 func (c *Connection) connect() {
 	host := c.Bot.Config.Server + ":" + c.Bot.Config.Port
 	u := url.URL{Scheme: "ws", Host: host, Path: "/showdown/websocket"}
-	Info(&Log, fmt.Sprintf("Connecting to %s...", u.String()))
+	Info(fmt.Sprintf("Connecting to %s...", u.String()))
 
 	var res *http.Response
 	var err error
@@ -72,7 +76,7 @@ func (c *Connection) startReading() {
 				CheckErr(err)
 
 				if msgType != websocket.TextMessage && msgType != -1 {
-					Error(&Log, ErrUnexpectedMessageType)
+					Error(ErrUnexpectedMessageType)
 				}
 
 				var room string
@@ -99,16 +103,16 @@ func (c *Connection) startSending() {
 		for {
 			select {
 			case msg := <-c.queue:
-				Send(c, msg)
+				send(c, msg)
 				ms := 1000.0 / c.Bot.Config.MessagesPerSecond
 				time.Sleep(time.Duration(ms) * time.Millisecond)
 			case <-interrupt:
-				Warn(&Log, "Process was interrupted. Closing connection...")
+				Warn("Process was interrupted. Closing connection...")
 
 				// Send a close frame and wait for the server to close the connection.
 				err := c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 				if err != nil {
-					Error(&Log, err)
+					Error(err)
 					return
 				}
 
@@ -138,14 +142,14 @@ func (c *Connection) startSending() {
 	}()
 }
 
-// Adds a message to the outgoing queue. Prefer to use this over Send.
+// QueueMessage adds a message to the outgoing queue.
 func (c *Connection) QueueMessage(msg string) {
 	c.queue <- msg
 }
 
-// Sends a message upstream to the websocket.
-func Send(c *Connection, s string) {
-	Outgoing(&Log, s)
+// Sends a message upstream to the websocket ignoring the message queue.
+func send(c *Connection, s string) {
+	logOutgoingAll(loggers, s)
 
 	err := c.conn.WriteMessage(websocket.TextMessage, []byte(s))
 	CheckErr(err)
@@ -153,17 +157,17 @@ func Send(c *Connection, s string) {
 
 // Parses the message and difers it to a relevant handler.
 func (c *Connection) parse(s string) {
-	msg := NewMessage(s, c.Bot)
+	m := NewMessage(s, c.Bot)
 
 	// Log the incoming messages to every logger.
-	IncomingAll(ActiveLoggers, s)
+	logIncomingAll(loggers, s)
 
-	cmd := strings.ToLower(msg.Command)
+	cmd := strings.ToLower(m.Command)
 
 	switch cmd {
 	case ":":
-		LoginTime = msg.Timestamp
+		LoginTime[m.Room.Name] = m.Timestamp
 	}
 
-	callHandler(handlers, cmd, msg)
+	callHandler(handlers, cmd, m)
 }

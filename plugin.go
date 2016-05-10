@@ -8,23 +8,26 @@ import (
 	"time"
 )
 
-// A plugin is a command that triggers on some regexp and performs a task
-// based on the message that triggered it. It can trigger on several
-// different formats (consider prefix "." and command "cmd"). Note that
-// cooldowns will not affect command syntax, but will ignore the command
-// should it have been sent less than Cooldown time from the last instance.
+// Plugin is a command that triggers on some regexp and performs a task
+// based on the message that triggered it as defined by its EventHandler.
+// It can trigger on several different formats (consider prefix "." and
+// command "cmd"). Note that cooldowns will not affect command syntax, but
+// will ignore the commands hould it have been sent less than Cooldown time
+// from the last instance.
 //
 // NewPlugin: ".cmd"
 // NewPluginWithArgs:
 //   1 arg:  ".cmd arg0"
-//   2 args: ".cmd arg1, arg0" (space is optional)
-//   n args: ".cmd arg1, arg2, arg3, ..., arg n, arg0"
+//   2 args: ".cmd arg0, arg1" (space is optional)
+//   n args: ".cmd arg0,arg1,arg2,arg3, ...,arg n" (space is optional)
 //
-// See that the last argument is always considered to be the first, after
-// which they are numbered in the order provided.
+// It is possible to define a Command with a regexp string. For example,
+// a command of "y|n" will trigger on either y or n.
 //
-// It is possible to define a Command with a regexp. For example, a command
-// of "say|echo" will trigger on either say or echo.
+// Note that if a command is given as something like s(ay|peak) then the
+// parsed args will be pushed back in the slice, and args[0] will contain
+// the string of either "ay" or "peak", depending on which triggered the
+// message.
 //
 // Each fired event is run in its own separate goroutine, so for anything
 // that must be run sequentially (ie. cannot read and write to the same file
@@ -42,7 +45,7 @@ type Plugin struct {
 	k            Killable
 }
 
-// A timed plugin will fire an event on a regular schedule defined by the
+// TimedPlugin structs will fire an event on a regular schedule defined by the
 // time.Duration provided to the time.Ticker. Each event is run in its own
 // goroutine, so every event will fire regardless of whether or not the last
 // event ticked had completed. For anything that must be run sequentially
@@ -61,30 +64,41 @@ type TimedPlugin struct {
 	k                 Killable
 }
 
+// DefaultEventHandler is the default event handler that you can make use of
+// if you do not want to encapsulate your plugin with any custom behaviour.
+// Refer to the example plugins to see how you can make use of this.
 type DefaultEventHandler struct {
 	Plugin *Plugin
 }
 
+// DefaultTimedEventHandler is the default event handler for a TimedPlugin.
+// Refer to the example plugins to see how you can make use of this.
 type DefaultTimedEventHandler struct {
 	TimedPlugin *TimedPlugin
 }
 
-// Define different convenient ways to make new Plugin structs. You must add
-// the bot and event handlers after creation with these methods. If you want
+// NewPlugin (and its variants) define convenient ways to make new Plugin
+// structs. You must add an event handler after creation. If you want
 // to add custom prefixes or suffixes, you can do it with the Plugin.SetPrefix
 // and Plugin.SetSuffix methods. Otherwise the bot will load prefixes and
 // suffixes from your Config.
+//
+// NewPlugin in particular creates a Plugin that will trigger on a command.
 func NewPlugin(cmd string) *Plugin {
 	return &Plugin{
 		Command: cmd,
 	}
 }
 
-// Will be triggered on every chat and private event.
+// NewPluginWithoutCommand creates a new Plugin that will trigger on every
+// chat and private event.
 func NewPluginWithoutCommand() *Plugin {
 	return &Plugin{}
 }
 
+// NewPluginWithArgs creates a new Plugin that will trigger on a command, and
+// will parse comma-separated arguments provided along with the command. It
+// will not trigger unless an adequate amount of commas are present.
 func NewPluginWithArgs(cmd string, numArgs int) *Plugin {
 	return &Plugin{
 		Command: cmd,
@@ -92,6 +106,9 @@ func NewPluginWithArgs(cmd string, numArgs int) *Plugin {
 	}
 }
 
+// NewPluginWithCooldown creates a new Plugin that will trigger on a command,
+// but will not trigger if the last time it was used was not at least the
+// provided time.Duration ago.
 func NewPluginWithCooldown(cmd string, cooldown time.Duration) *Plugin {
 	return &Plugin{
 		Command:  cmd,
@@ -99,6 +116,8 @@ func NewPluginWithCooldown(cmd string, cooldown time.Duration) *Plugin {
 	}
 }
 
+// NewPluginWithArgsAndCooldown creates a new Plugin with arguments and a
+// cooldown as described by both NewPluginWithArgs and NewPluginWithCooldown.
 func NewPluginWithArgsAndCooldown(cmd string, numArgs int, cooldown time.Duration) *Plugin {
 	return &Plugin{
 		Command:  cmd,
@@ -107,27 +126,34 @@ func NewPluginWithArgsAndCooldown(cmd string, numArgs int, cooldown time.Duratio
 	}
 }
 
+// NewTimedPlugin creates a new TimedPlugin that fires events on its
+// TimedEventHandler every given period of time.Duration.
 func NewTimedPlugin(period time.Duration) *TimedPlugin {
 	return &TimedPlugin{
 		Period: period,
 	}
 }
 
+// NewDefaultEventHandler creates a new DefaultEventHandler.
+// TODO Perhaps this isn't useful.
 func NewDefaultEventHandler(p *Plugin) *DefaultEventHandler {
 	return &DefaultEventHandler{Plugin: p}
 }
 
-// Allows you to use a custom event handler with any fields you want.
+// SetEventHandler sets the EventHandler of the Plugin.
+// Allows you to use a custom EventHandler with any fields you want.
+// The EventHandler of every Plugin MUST be set after the creation of a Plugin.
 func (p *Plugin) SetEventHandler(eh EventHandler) {
 	p.EventHandler = eh
 }
 
+// SetEventHandler sets the TimedEventHandler of the TimedPlugin.
+// The TimedEventHandler of every TimedPlugin MUST be set after its creation.
 func (tp *TimedPlugin) SetEventHandler(teh TimedEventHandler) {
 	tp.TimedEventHandler = teh
 }
 
-// Call this if you want this plugin to match to prefixes other than the
-// default prefixes defined in your Config.
+// SetPrefix overrides the Plugin's default Prefix as read by the Config.
 func (p *Plugin) SetPrefix(prefixes []string) {
 	if len(prefixes) == 0 {
 		return
@@ -140,8 +166,7 @@ func (p *Plugin) SetPrefix(prefixes []string) {
 	p.Prefix = reg
 }
 
-// Call this if you want this plugin to match to suffixes other than the
-// default suffixes defined in your Config.
+// SetSuffix overrides the Plugin's default Suffix as read by the Config.
 func (p *Plugin) SetSuffix(suffixes []string) {
 	if len(suffixes) == 0 {
 		return
@@ -154,7 +179,9 @@ func (p *Plugin) SetSuffix(suffixes []string) {
 	p.Suffix = reg
 }
 
-func (p *Plugin) FormatPrefixAndSuffix() {
+// Formats the prefixes and suffixes into the regexp that will be used to match
+// messages.
+func (p *Plugin) formatPrefixAndSuffix() {
 	ps := p.Prefix.String()
 	ss := p.Suffix.String()
 	var flags string
@@ -192,7 +219,7 @@ func (p *Plugin) match(m *Message) bool {
 	return p.Prefix.MatchString(m.Message) && p.Suffix.MatchString(m.Message)
 }
 
-// Parse the message. Returns the arguments provided to the message:
+// Parse the message. Returns the arguments provided to the message.
 func (p *Plugin) parse(m *Message) []string {
 	submatches := p.Prefix.FindStringSubmatch(m.Message)
 
@@ -207,14 +234,14 @@ func (p *Plugin) parse(m *Message) []string {
 // Starts a loop in its own goroutine listening for events.
 // Recovers errors so that the bot doesn't crash on plugin errors.
 // TODO Better output than simply debug.PrintStack()
-func (p *Plugin) Listen() {
+func (p *Plugin) listen() {
 	go func() {
 		for {
 			select {
 			case m := <-p.Bot.pluginChatChannelsRead(p.Name):
 				if !p.Bot.Config.IgnoreChatMessages && p.match(m) {
 					args := p.parse(m)
-					Debugf(&Log, "[on plugin] Starting chat event handler goroutine for plugin `%s` with args `%+v`", p.Name, args)
+					Debugf("[on plugin] Starting chat event handler goroutine for plugin `%s` with args `%+v`", p.Name, args)
 					if m.Time.Sub(p.LastUsed) > p.Cooldown {
 						p.LastUsed = m.Time
 						go func() {
@@ -222,7 +249,7 @@ func (p *Plugin) Listen() {
 								if r := recover(); r != nil {
 									err, ok := r.(error)
 									if !ok {
-										Error(&Log, err)
+										Error(err)
 										debug.PrintStack()
 									}
 								}
@@ -235,7 +262,7 @@ func (p *Plugin) Listen() {
 			case m := <-p.Bot.pluginPrivateChannelsRead(p.Name):
 				if !p.Bot.Config.IgnorePrivateMessages && p.match(m) {
 					args := p.parse(m)
-					Debugf(&Log, "[on plugin] Starting private event handler goroutine for plugin `%s` with args `%+v`", p.Name, args)
+					Debugf("[on plugin] Starting private event handler goroutine for plugin `%s` with args `%+v`", p.Name, args)
 					if m.Time.Sub(p.LastUsed) > p.Cooldown {
 						p.LastUsed = m.Time
 						go func() {
@@ -243,7 +270,7 @@ func (p *Plugin) Listen() {
 								if r := recover(); r != nil {
 									err, ok := r.(error)
 									if !ok {
-										Error(&Log, err)
+										Error(err)
 										debug.PrintStack()
 									}
 								}
@@ -262,13 +289,13 @@ func (p *Plugin) Listen() {
 }
 
 // Request the termination of the Plugin.Listen loop.
-func (p *Plugin) StopListening() {
+func (p *Plugin) stopListening() {
 	p.k.Kill()
 	p.k.Wait()
 }
 
 // Starts a loop listening on the time.Ticker.
-func (tp *TimedPlugin) Start() {
+func (tp *TimedPlugin) start() {
 	tp.Ticker = time.NewTicker(tp.Period)
 	go func() {
 		for {
@@ -284,22 +311,23 @@ func (tp *TimedPlugin) Start() {
 }
 
 // Request the termination of the TimedPlugin.Start loop.
-func (tp *TimedPlugin) Stop() {
+func (tp *TimedPlugin) stop() {
 	tp.Ticker.Stop()
 	tp.k.Kill()
 	tp.k.Wait()
 }
 
-// Defines the behaviour and action of any event on a Plugin. Use the
-// DefaultEventHandler unless you want to add custom behaviour. For example,
-// you could keep track of variables that are known globally to the plugin.
-// (Every Plugin event goes through the same handler)
+// EventHandler defines the behaviour and action of any event on a Plugin. Use
+// the DefaultEventHandler unless you want to add custom behaviour. For
+// example, you could keep track of variables that are known globally to the
+// plugin. (Every Plugin event goes through the same handler)
 type EventHandler interface {
 	HandleEvent(*Message, []string)
 }
 
-// Defines the behaviour and action of any event on a TimedPlugin. Use the
-// DefaultTimedEventHandler unless you want to add custom behaviour.
+// TimedEventHandler defines the behaviour and action of any event on a
+// TimedPlugin. Use the  DefaultTimedEventHandler unless you want to add custom
+// behaviour.
 type TimedEventHandler interface {
 	HandleEvent()
 }

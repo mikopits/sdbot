@@ -27,11 +27,11 @@ type Config struct {
 }
 
 // Reads the config data from toml config file.
-func ReadConfig() *Config {
+func readConfig() *Config {
 	configfile := "config.toml"
 	_, err := os.Stat(configfile)
 	if err != nil {
-		Fatalf(&Log, "Config file is missing: %s", configfile)
+		Fatalf("Config file is missing: %s", configfile)
 	}
 
 	var config Config

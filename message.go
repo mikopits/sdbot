@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// Message represents a message sent by a user to either a room the bot is
+// currently in, or to the bot via private messages. A message also defines
+// behaviour in its methods to reply to these messages.
 type Message struct {
 	Bot       *Bot
 	Time      time.Time
@@ -21,7 +24,7 @@ type Message struct {
 	Matches   map[string]map[*regexp.Regexp][]string
 }
 
-// Room name, other message content, bot
+// NewMessage creates a new message and parses the message.
 func NewMessage(s string, bot *Bot) *Message {
 	m := &Message{
 		Bot:     bot,
@@ -34,6 +37,7 @@ func NewMessage(s string, bot *Bot) *Message {
 
 // Parse a raw message and return data in the following order:
 // Command, Params, Timestamp, Room, User, Auth, Target, Message
+// TODO Reduce cyclic complexity? Lots of ifs ands and switches.
 func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string, Target, string) {
 	newlineDelimited := strings.Split(s, "\n")
 	vertbarDelimited := strings.Split(s, "|")
@@ -68,9 +72,7 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	var err error
 	if strings.Contains(command, ":") {
 		timestamp, err = strconv.Atoi(params[0])
-		if err != nil {
-			Error(&Log, err)
-		}
+		CheckErr(err)
 	} else {
 		timestamp = 0
 	}
@@ -123,18 +125,23 @@ func parseMessage(s string, b *Bot) (string, []string, int, *Room, *User, string
 	return command, params, timestamp, room, user, auth, room, message
 }
 
-// Reply to a message
+// Reply responds to a message and prepends the username of the user the bot
+// is responding to.
 func (m *Message) Reply(res string) {
 	m.Target.Reply(m, res)
 }
 
-// Reply to a message without prepending the user's name
+// RawReply responds to a message without prepending anything to the message.
+// Note that you should take care to not allow users to influence a raw
+// reply message to do a client command. For this reason, prefer to use
+// Reply unless you are responding with a static message. You may want to
+// event freeze the string.
 func (m *Message) RawReply(res string) {
 	m.Target.RawReply(m, res)
 }
 
-// Add matches to the message and return true if there was no previous match
-// and if there was indeed a match.
+// Match adds matches to the message and return true if there was no previous
+// match and if there was indeed a match.
 func (m *Message) Match(r *regexp.Regexp, event string) bool {
 	if m.Matches[event][r] == nil {
 		matches := r.FindStringSubmatch(m.Message)
@@ -146,7 +153,7 @@ func (m *Message) Match(r *regexp.Regexp, event string) bool {
 	return false
 }
 
-// Returns true if the message was sent in a private message.
+// Private returns true if the message was sent in a private message.
 func (m *Message) Private() bool {
 	return m.User == m.Target
 }

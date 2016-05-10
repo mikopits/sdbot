@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// The colour codes for tty to be used with colourize.
 const (
 	reset   string = "\x1b[0m"
 	bold    string = "\x1b[1m"
@@ -18,7 +19,8 @@ const (
 	bgWhite string = "\x1b[47m"
 )
 
-// Logs everything with pretty colours. Looks good with the Solarized terminal theme.
+// PrettyLogger logs everything with pretty colours. Looks good with the
+// Solarized terminal theme.
 // Don't like how it looks? Make your own!
 type PrettyLogger struct {
 	AnyLogger
@@ -26,17 +28,17 @@ type PrettyLogger struct {
 
 func (lo *PrettyLogger) formatMessage(s string, level int) string {
 	switch level {
-	case LevelDebug:
+	case levelDebug:
 		fallthrough
-	case LevelWarn:
+	case levelWarn:
 		return formatDebug(s)
-	case LevelInfo:
+	case levelInfo:
 		return formatInfo(s)
-	case LevelError:
+	case levelError:
 		return formatError(s)
-	case LevelIncoming:
+	case levelIncoming:
 		return formatIncoming(s)
-	case LevelOutgoing:
+	case levelOutgoing:
 		return formatOutgoing(s)
 	default:
 		return formatGeneral(s)

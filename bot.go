@@ -11,15 +11,7 @@ import (
 	"sync"
 )
 
-const (
-	LoginURL = "https://play.pokemonshowdown.com/action.php"
-)
-
-// TODO Complete LoggerList functionality.
-var Log Logger
-var ActiveLoggers *LoggerList
-
-// The Bot struct is the entrypoint to all the necessary behaviour of the bot.
+// Bot represents the entrypoint to all the necessary behaviour of the bot.
 // The bot runs its handlers in separate goroutines, so an API is provided to
 // allow for thread-safe and concurrent access to the bot. See the Synchronize
 // method for how this works.
@@ -42,10 +34,12 @@ type Bot struct {
 	semaphores            map[string]*sync.Mutex
 }
 
-// Creates a new bot instance.
+// NewBot creates a new instance of the Bot struct. In doing so it creates a
+// new Connection as well as adds a PrettyLogger to the Loggers that logs to
+// os.Stderr.
 func NewBot() *Bot {
 	b := &Bot{
-		Config:                ReadConfig(),
+		Config:                readConfig(),
 		UserList:              make(map[string]*User),
 		RoomList:              make(map[string]*Room),
 		Plugins:               []*Plugin{},
@@ -60,44 +54,26 @@ func NewBot() *Bot {
 		Bot:   b,
 		queue: make(chan string, 64),
 	}
-	Log = &PrettyLogger{AnyLogger{Output: os.Stderr}}
-	ActiveLoggers = NewLoggerList(&PrettyLogger{AnyLogger{Output: os.Stderr}})
+	loggers = NewLoggerList(&PrettyLogger{AnyLogger{Output: os.Stderr}})
 	return b
 }
 
-// TODO Refactor the logging system to log to every logger in Bot.Loggers
-// whenever a log function is called. Allows for custom loggers with file
-// outputs.
-// Adds a logger.
-func AddLogger(lo Logger) {
-	ActiveLoggers.Loggers = append(ActiveLoggers.Loggers, lo)
-}
-
-// Removes a logger. Returns true if the logger was successfully removed.
-func RemoveLogger(lo Logger) bool {
-	for i, logger := range ActiveLoggers.Loggers {
-		if logger == lo {
-			ActiveLoggers.Loggers = append(ActiveLoggers.Loggers[:i], ActiveLoggers.Loggers[i+1:]...)
-			return true
-		}
-	}
-	return false
-}
-
-// Connects to the Pokemon Showdown server.
+// login connects to the Pokemon Showdown server.
 func (b *Bot) login(msg *Message) {
 	var res *http.Response
 	var err error
 
+	loginURL := "https://play.pokemonshowdown.com/action.php"
+
 	if b.Config.Password == "" {
 		res, err = http.Get(strings.Join([]string{
-			LoginURL,
+			loginURL,
 			"?act=getassertion&userid=", Sanitize(b.Config.Nick),
 			"&challengekeyid=", msg.Params[0],
 			"&challenge=", msg.Params[1],
 		}, ""))
 	} else {
-		res, err = http.PostForm(LoginURL, url.Values{
+		res, err = http.PostForm(loginURL, url.Values{
 			"act":            {"login"},
 			"name":           {b.Config.Nick},
 			"pass":           {b.Config.Password},
@@ -126,7 +102,7 @@ func (b *Bot) login(msg *Message) {
 	}
 }
 
-// Joins a room.
+// JoinRoom makes the bot join a room.
 func (b *Bot) JoinRoom(room *Room) {
 	var joinRoom = func() interface{} {
 		b.Rooms = append(b.Rooms, room.Name)
@@ -141,7 +117,7 @@ func (b *Bot) JoinRoom(room *Room) {
 	b.Connection.QueueMessage("|/join " + room.Name)
 }
 
-// Leaves a room.
+// LeaveRoom makes the bot leave a room.
 func (b *Bot) LeaveRoom(room *Room) {
 	var leaveRoom = func() interface{} {
 		for i, r := range b.Rooms {
@@ -161,17 +137,17 @@ func (b *Bot) LeaveRoom(room *Room) {
 var ErrPluginNameAlreadyRegistered = errors.New("sdbot: plugin name was already in use (register under another name)")
 var ErrPluginAlreadyRegistered = errors.New("sdbot: plugin was already registered")
 
-// Registers a plugin under a name and starts listening on its event handler.
+// RegisterPlugin registers a plugin under a name and starts listening on its event handler.
 func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 	for _, plugin := range b.Plugins {
 		if plugin == p {
-			Error(&Log, ErrPluginAlreadyRegistered)
+			Error(ErrPluginAlreadyRegistered)
 			return ErrPluginAlreadyRegistered
 		}
 	}
 
 	if b.PluginChatChannels[name] != nil {
-		Error(&Log, ErrPluginNameAlreadyRegistered)
+		Error(ErrPluginNameAlreadyRegistered)
 		return ErrPluginNameAlreadyRegistered
 	} else {
 		p.Bot = b
@@ -185,8 +161,8 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 			p.Suffix = b.Config.PluginSuffix
 		}
 
-		p.FormatPrefixAndSuffix()
-		Debugf(&Log, "[on bot] Registering plugin `%s` listening on prefix `%v` and suffix `%v`", name, p.Prefix, p.Suffix)
+		p.formatPrefixAndSuffix()
+		Debugf("[on bot] Registering plugin `%s` listening on prefix `%v` and suffix `%v`", name, p.Prefix, p.Suffix)
 
 		chatChannel := make(chan *Message, 64)
 		privateChannel := make(chan *Message, 64)
@@ -195,11 +171,11 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 	}
 
 	b.Plugins = append(b.Plugins, p)
-	p.Listen()
+	p.listen()
 	return nil
 }
 
-// Register a slice of plugins in one call.
+// RegisterPlugins registers a slice of plugins in one call.
 // The map should be formatted with pairs of "plugin name"=>*Plugin.
 func (b *Bot) RegisterPlugins(plugins map[string]*Plugin) error {
 	for name, p := range plugins {
@@ -209,28 +185,28 @@ func (b *Bot) RegisterPlugins(plugins map[string]*Plugin) error {
 	return nil
 }
 
-// Registers a timed plugin under the provided name. Timed plugins are not
-// Started until the bot is logged in.
+// RegisterTimedPlugin registers a timed plugin under the provided name.
+// Timed plugins are not started until the bot is logged in.
 func (b *Bot) RegisterTimedPlugin(tp *TimedPlugin, name string) error {
 	for _, plugin := range b.TimedPlugins {
 		if plugin.Name == tp.Name {
-			Error(&Log, ErrPluginNameAlreadyRegistered)
+			Error(ErrPluginNameAlreadyRegistered)
 			return ErrPluginNameAlreadyRegistered
 		}
 	}
-	Debugf(&Log, "[on bot] Registering timed plugin `%s` with period `%f`", name, tp.Period)
+	Debugf("[on bot] Registering timed plugin `%s` with period `%f`", name, tp.Period)
 	tp.Bot = b
 	b.TimedPlugins = append(b.TimedPlugins, tp)
 	return nil
 }
 
-// Unregister a plugin.
+// UnregisterPlugin unregisters a plugin.
 // Returns true if the plugin was successfully unregistered.
 func (b *Bot) UnregisterPlugin(p *Plugin) bool {
 	for i, plugin := range b.Plugins {
 		if plugin == p {
-			Debugf(&Log, "[on bot] Unregistering plugin `%s`", p.Name)
-			p.StopListening()
+			Debugf("[on bot] Unregistering plugin `%s`", p.Name)
+			p.stopListening()
 			delete(b.PluginChatChannels, p.Name)
 			delete(b.PluginPrivateChannels, p.Name)
 			b.Plugins = append(b.Plugins[:i], b.Plugins[i+1:]...)
@@ -240,20 +216,20 @@ func (b *Bot) UnregisterPlugin(p *Plugin) bool {
 	return false
 }
 
-// Unregister all plugins.
+// UnregisterPlugins unregisters all plugins.
 func (b *Bot) UnregisterPlugins() {
 	for _, plugin := range b.Plugins {
 		b.UnregisterPlugin(plugin)
 	}
 }
 
-// Unregister a timed plugin.
+// UnregisterTimedPlugin unregisters a timed plugin.
 // Returns true if the plugin was successfully unregistered.
 func (b *Bot) UnregisterTimedPlugin(tp *TimedPlugin) bool {
 	for i, plugin := range b.TimedPlugins {
 		if plugin.Name == tp.Name {
-			Debugf(&Log, "[on bot] Unregistering timed plugin `%s`", tp.Name)
-			tp.Stop()
+			Debugf("[on bot] Unregistering timed plugin `%s`", tp.Name)
+			tp.stop()
 			b.TimedPlugins = append(b.TimedPlugins[:i], b.TimedPlugins[i+1:]...)
 			return true
 		}
@@ -261,17 +237,17 @@ func (b *Bot) UnregisterTimedPlugin(tp *TimedPlugin) bool {
 	return false
 }
 
-// Start all registered TimedPlugins
+// StartTimedPlugins starts all registered TimedPlugins.
 func (b *Bot) StartTimedPlugins() {
 	for _, tp := range b.TimedPlugins {
-		tp.Start()
+		tp.start()
 	}
 }
 
-// Stop all registered TimedPlugins
+// StopTimedPlugins stops all registered TimedPlugins.
 func (b *Bot) StopTimedPlugins() {
 	for _, tp := range b.TimedPlugins {
-		tp.Stop()
+		tp.stop()
 	}
 }
 
@@ -299,7 +275,7 @@ func (b *Bot) pluginPrivateChannelsRead(s string) chan *Message {
 	return *b.PluginPrivateChannels[s]
 }
 
-// Provides an API to keep your code thread-safe and concurrent.
+// Synchronize provides an API to keep your code thread-safe and concurrent.
 // For example, if a plugin is going to write to a file, it would be a bad idea
 // to have multiple threads with different state to try to access the file at
 // the same time. So you should run such commands under Bot.Synchronize.
@@ -308,7 +284,7 @@ func (b *Bot) pluginPrivateChannelsRead(s string) chan *Message {
 //
 // Example:
 // var doUnsafeAction = func() interface{} {
-//   // Some action that must be performed sequentially.
+//   someActionThatMustBePerformedSequentially()
 //   return nil
 // }
 // bot.Synchronize("uniqueIdentifierForUnsafeAction", &doUnsafeAction)
@@ -326,7 +302,7 @@ func (b *Bot) Synchronize(name string, lambda *func() interface{}) interface{} {
 	return (*lambda)()
 }
 
-// Starts the bot and connect to the websocket.
+// Connect starts the bot and connects to the websocket.
 func (b *Bot) Connect() {
 	b.Connection.connect()
 }

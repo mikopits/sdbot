@@ -1,93 +1,133 @@
 package sdbot
 
+// LoggerList represents a list of Loggers with methods that allow you to
+// log to every one of them as per each loggers' individual logging behaviour.
 type LoggerList struct {
 	Loggers []Logger
 }
 
+// NewLoggerList creates a new LoggerList from a slice of Loggers.
 func NewLoggerList(loggers ...Logger) *LoggerList {
 	return &LoggerList{Loggers: loggers}
 }
 
-func DebugAll(lol *LoggerList, s string) {
+// loggers is the list of loggers that the bot will log to. Access to these
+// loggers is provided in the helpers in helpers.go exports.
+var loggers *LoggerList
+
+// AddLogger adds a logger to the LoggerList Loggers.
+func AddLogger(lo Logger) {
+	loggers.Loggers = append(loggers.Loggers, lo)
+}
+
+// RemoveLogger removes a logger from the LoggerLit Loggers.
+// Returns true if the logger was successfully removed.
+func RemoveLogger(lo Logger) bool {
+	for i, logger := range loggers.Loggers {
+		if logger == lo {
+			loggers.Loggers = append(loggers.Loggers[:i], loggers.Loggers[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// Log debug messages to all loggers in the LoggerList.
+func logDebugAll(lol *LoggerList, s string) {
 	for _, lo := range lol.Loggers {
-		Debug(&lo, s)
+		logDebug(&lo, s)
 	}
 }
 
-func InfoAll(lol *LoggerList, s string) {
+// Log informatic messages to all loggers in the LoggerList.
+func logInfoAll(lol *LoggerList, s string) {
 	for _, lo := range lol.Loggers {
-		Info(&lo, s)
+		logInfo(&lo, s)
 	}
 }
 
-func WarnAll(lol *LoggerList, s string) {
+// Log warning messages to all loggers in the LoggerList.
+func logWarnAll(lol *LoggerList, s string) {
 	for _, lo := range lol.Loggers {
-		Warn(&lo, s)
+		logWarn(&lo, s)
 	}
 }
 
-func ErrorAll(lol *LoggerList, err error) {
+// Log errors to all loggers in the LoggerList.
+func logErrorAll(lol *LoggerList, err error) {
 	for _, lo := range lol.Loggers {
-		Error(&lo, err)
+		logError(&lo, err)
 	}
 }
 
-func FatalAll(lol *LoggerList, s string) {
+// Log fatal messages to all loggers in the LoggerList.
+func logFatalAll(lol *LoggerList, s string) {
 	for _, lo := range lol.Loggers {
-		Fatal(&lo, s)
+		logFatal(&lo, s)
 	}
 }
 
-func IncomingAll(lol *LoggerList, s string) {
+// Log messages from the websocket to all loggers in the LoggerList.
+func logIncomingAll(lol *LoggerList, s string) {
 	for _, lo := range lol.Loggers {
-		Incoming(&lo, s)
+		logIncoming(&lo, s)
 	}
 }
 
-func OutgoingAll(lol *LoggerList, s string) {
+// Log messages being sent to the websocket to all loggers in the LoggerList.
+func logOutgoingAll(lol *LoggerList, s string) {
 	for _, lo := range lol.Loggers {
-		Outgoing(&lo, s)
+		logOutgoing(&lo, s)
 	}
 }
 
-func DebugAllf(lol *LoggerList, format string, a ...interface{}) {
+// Log debug messages with arguments to all loggers in the LoggerList.
+func logDebugAllf(lol *LoggerList, format string, a ...interface{}) {
 	for _, lo := range lol.Loggers {
-		Debugf(&lo, format, a...)
+		logDebugf(&lo, format, a...)
 	}
 }
 
-func InfoAllf(lol *LoggerList, format string, a ...interface{}) {
+// Log informatic messages with arguments to all loggers in the LoggerList.
+func logInfoAllf(lol *LoggerList, format string, a ...interface{}) {
 	for _, lo := range lol.Loggers {
-		Infof(&lo, format, a...)
+		logInfof(&lo, format, a...)
 	}
 }
 
-func WarnAllf(lol *LoggerList, format string, a ...interface{}) {
+// Log warning messages with arguments to all loggers in the LoggerList.
+func logWarnAllf(lol *LoggerList, format string, a ...interface{}) {
 	for _, lo := range lol.Loggers {
-		Warnf(&lo, format, a...)
+		logWarnf(&lo, format, a...)
 	}
 }
 
-func ErrorAllf(lol *LoggerList, format string, a ...interface{}) {
+// Log errors with arguments to all loggers in the LoggerList.
+func logErrorAllf(lol *LoggerList, format string, a ...interface{}) {
 	for _, lo := range lol.Loggers {
-		Errorf(&lo, format, a...)
+		logErrorf(&lo, format, a...)
 	}
 }
 
-func FatalAllf(lol *LoggerList, format string, a ...interface{}) {
+// Log fatal messages with arguments to all loggers in the LoggerList.
+func logFatalAllf(lol *LoggerList, format string, a ...interface{}) {
 	for _, lo := range lol.Loggers {
-		Fatalf(&lo, format, a...)
+		logFatalf(&lo, format, a...)
 	}
 }
 
-func IncomingAllf(lol *LoggerList, format string, a ...interface{}) {
+// Log messages from the websocket with arguments to all loggers in the
+// LoggerList. TODO Probably don't need this.
+func logIncomingAllf(lol *LoggerList, format string, a ...interface{}) {
 	for _, lo := range lol.Loggers {
-		Incomingf(&lo, format, a...)
+		logIncomingf(&lo, format, a...)
 	}
 }
 
-func OutgoingAllf(lol *LoggerList, format string, a ...interface{}) {
+// Log messages being sent to the websocket with arguments to all loggers in
+// the LoggerList. TODO Probably don't need this.
+func logOutgoingAllf(lol *LoggerList, format string, a ...interface{}) {
 	for _, lo := range lol.Loggers {
-		Outgoingf(&lo, format, a...)
+		logOutgoingf(&lo, format, a...)
 	}
 }

@@ -19,7 +19,7 @@ const (
 	Locked        = `‽`
 )
 
-var AuthLevels = map[string]int{
+var authLevels = map[string]int{
 	Locked:        0,
 	Muted:         1,
 	Unvoiced:      2,
@@ -33,16 +33,20 @@ var AuthLevels = map[string]int{
 	Administrator: 10,
 }
 
+// User represents a user with their username and the auth levels in rooms
+// that the bot knows about.
 type User struct {
 	Name  string
-	Auths map[string]string // Map of room names to auth strings
+	Auths map[string]string
 }
 
+// Room represents a room with its name and the users currently in it.
 type Room struct {
 	Name  string
-	Users []string // List of unique sanitized names of users in the room
+	Users []string // List of unique SANITIZED names of users in the room
 }
 
+// NewUser creates a new User, initializing the Auths map.
 func NewUser(name string) *User {
 	return &User{
 		Name:  name,
@@ -50,7 +54,8 @@ func NewUser(name string) *User {
 	}
 }
 
-// Responds to a user in private message.
+// Reply responds to a user in private message and prepends the user's name to
+// the response.
 func (u *User) Reply(m *Message, res string) {
 	s := fmt.Sprintf("(%s) %s", m.User.Name, res)
 	if len(s) > 300 {
@@ -59,7 +64,8 @@ func (u *User) Reply(m *Message, res string) {
 	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/w %s,%s", u.Name, s))
 }
 
-// Responds to a user in a room.
+// Reply responds to a user in a chat message and prepends the user's name to
+// the response. The message is sent to the Room of the method's receiver.
 func (r *Room) Reply(m *Message, res string) {
 	s := fmt.Sprintf("(%s) %s", m.User.Name, res)
 	if len(s) > 300 {
@@ -68,7 +74,8 @@ func (r *Room) Reply(m *Message, res string) {
 	m.Bot.Connection.QueueMessage(fmt.Sprintf("%s|%s", r.Name, s))
 }
 
-// Responds to a user in private message without prepending their username.
+// RawReply responds to a user in private message without prepending their
+// username.
 func (u *User) RawReply(m *Message, res string) {
 	if len(res) > 300 {
 		res = res[:300]
@@ -76,7 +83,7 @@ func (u *User) RawReply(m *Message, res string) {
 	m.Bot.Connection.QueueMessage(fmt.Sprintf("|/w %s,%s", u.Name, res))
 }
 
-// Responds to a user in a room without prepending their username.
+// RawReply responds to a user in a room without prepending their username.
 func (r *Room) RawReply(m *Message, res string) {
 	if len(res) > 300 {
 		res = res[:300]
@@ -84,12 +91,12 @@ func (r *Room) RawReply(m *Message, res string) {
 	m.Bot.Connection.QueueMessage(fmt.Sprintf("%s|%s", r.Name, res))
 }
 
-// Add a room authority to the user.
+// AddAuth adds a room authority level to a user.
 func (u *User) AddAuth(room string, auth string) {
 	u.Auths[Sanitize(room)] = auth
 }
 
-// Adds a user to the room.
+// AddUser adds a user to the room.
 func (r *Room) AddUser(name string) {
 	sn := Sanitize(name)
 	for _, n := range r.Users {
@@ -101,7 +108,7 @@ func (r *Room) AddUser(name string) {
 	r.Users = append(r.Users, sn)
 }
 
-// Removes a user from the room.
+// RemoveUser removes a user from the room.
 func (r *Room) RemoveUser(name string) {
 	sn := Sanitize(name)
 	for i, n := range r.Users {
@@ -112,7 +119,7 @@ func (r *Room) RemoveUser(name string) {
 	}
 }
 
-// Finds a user if it exists, creates the user if it doesn't.
+// FindUserEnsured finds a user if it exists, creates the user if it doesn't.
 func FindUserEnsured(name string, bot *Bot) *User {
 	sn := Sanitize(name)
 
@@ -130,7 +137,7 @@ func FindUserEnsured(name string, bot *Bot) *User {
 	return bot.Synchronize("room", &updateUsers).(*User)
 }
 
-// Finds a room if it exists, creates the room if it doesn't.
+// FindRoomEnsured finds a room if it exists, creates the room if it doesn't.
 func FindRoomEnsured(name string, bot *Bot) *Room {
 	sn := Sanitize(name)
 
@@ -148,8 +155,8 @@ func FindRoomEnsured(name string, bot *Bot) *Room {
 	return bot.Synchronize("user", &updateRooms).(*Room)
 }
 
+// Rename renames a user and updates their record in the UserList.
 // TODO Test this. Doesn't seem to work as intended.
-// Renames a user.
 func Rename(old string, s string, bot *Bot) {
 	so := Sanitize(old)
 	sn := Sanitize(s)
@@ -167,12 +174,12 @@ func Rename(old string, s string, bot *Bot) {
 	bot.Synchronize("user", &rename)
 }
 
-// Check if a user has AT LEAST a given authorization level in a given room.
+// HasAuth checks if a user has AT LEAST a given authorization level in a given room.
 func (u *User) HasAuth(roomname string, level string) bool {
-	return AuthLevels[u.Auths[roomname]] >= AuthLevels[level]
+	return authLevels[u.Auths[roomname]] >= authLevels[level]
 }
 
-// A Target can be either a Room or a User. It represents where the bot will
+// Target represents either a Room or a User. The distinction is in where the bot will
 // send its message in response.
 type Target interface {
 	Reply(*Message, string)

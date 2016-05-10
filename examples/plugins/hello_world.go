@@ -1,5 +1,6 @@
 // Sample plugin for sdbot.
 // +build ignore
+
 package plugins
 
 import (

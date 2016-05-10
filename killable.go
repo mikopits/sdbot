@@ -34,7 +34,7 @@ import (
 	"sync"
 )
 
-// Killables are used to control the termination of goroutines.
+// Killable is a struct used to control the termination of goroutines.
 type Killable struct {
 	mutex sync.Mutex
 	dying chan struct{}
@@ -50,21 +50,25 @@ func (k *Killable) init() {
 	k.mutex.Unlock()
 }
 
+// Dying tells us if the Killable has been requested to terminate.
 func (k *Killable) Dying() <-chan struct{} {
 	k.init()
 	return k.dying
 }
 
+// Wait waits until the goroutine has been terminated.
 func (k *Killable) Wait() {
 	k.init()
 	<-k.dead
 }
 
+// Done requests termination and closes the dead channel.
 func (k *Killable) Done() {
 	k.Kill()
 	close(k.dead)
 }
 
+// Kill requests termination but does not close the dead channel.
 func (k *Killable) Kill() {
 	k.init()
 	k.mutex.Lock()
