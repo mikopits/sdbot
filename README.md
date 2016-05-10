@@ -11,6 +11,7 @@ Still in developmental stages. This means that the API is still likely to
 change at any time.
 
 [Package API Documentation](https://godoc.org/github.com/mikopits/sdbot)
+
 [Imported Packages and Dependencies](https://godoc.org/github.com/mikopits/sdbot?imports)
 
 Installation
