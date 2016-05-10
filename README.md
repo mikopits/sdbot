@@ -12,7 +12,7 @@ advantage of Go's inherent concurrency.
 
 Still in developmental stages. This means that the API is still likely to change at any time.
 
-SDBot has the following [Dependencies](https://godoc.org/github.com/mikopits/sdbot?imports).
+SDBot has the following [dependencies](https://godoc.org/github.com/mikopits/sdbot?imports).
 
 Installation
 ------------
@@ -52,3 +52,20 @@ func main() {
 ```
 
 And be sure to set your `config.toml` file in the same directory (See the [example](https://github.com/mikopits/sdbot/blob/master/examples/config/config_example.toml)).
+
+Contribute
+----------
+
+If you've gotten panics or have any other problems, go ahead and open an issue.
+
+Have an awesome feature you want to add? Looking at the source code and know
+you can solve a problem much more elegantly? Fork the project, develop the
+feature on its own branch, and submit a pull request. Or you can open an issue,
+tell me how dumb I am, and I can do it myself, I suppose.
+
+TODOs
+-----
+
+* Tests
+* Battle logic
+* More example plugins that sweep more features
