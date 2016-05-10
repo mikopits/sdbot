@@ -143,7 +143,7 @@ func onPopup(msg *Message) {
 
 	// Handle bans
 	if strings.Contains(msg.Params[2], "has banned you from the room") {
-		reg, err := regexp.Compile("(?P<user>[^ ]+) has banned you from the room (?P<room>[^ ]*).</p><p>To appeal")
+		reg, err := regexp.Compile("<p>(?P<user>[^ ]+) has banned you from the room (?P<room>[^ ]*).</p><p>To appeal")
 		if err != nil {
 			Error(&Log, err)
 		}
@@ -158,6 +158,8 @@ func onPopup(msg *Message) {
 		Warn(&Log, "You have been banned from the room "+room+" by the user "+user)
 		// This is a lazy solution, but the server no longer notifies you when
 		// you are unbanned. Try to rejoin after a potential kick.
+		// TODO Start a ticker that will attempt to join every some period of time that
+		// stops itself once the room has been joined.
 		time.Sleep(time.Second)
 		msg.Bot.JoinRoom(&Room{Name: room})
 	}
