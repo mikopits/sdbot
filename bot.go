@@ -134,7 +134,7 @@ func (b *Bot) LeaveRoom(room *Room) {
 	b.Connection.QueueMessage("|/leave " + room.Name)
 }
 
-// ErrPluginNameAlreadyRegisted is returned whenever a plugin with a particular
+// ErrPluginNameAlreadyRegistered is returned whenever a plugin with a particular
 // name is attempted to be registered, but the name has previously been
 // registered.
 var ErrPluginNameAlreadyRegistered = errors.New("sdbot: plugin name was already in use (register under another name)")
