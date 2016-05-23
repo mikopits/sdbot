@@ -198,9 +198,7 @@ func onFormats(m *Message) {
 			formats = append(formats, sanitized[:len(sanitized)-1])
 		}
 	}
-	m.Bot.BattleFormats = formats[1:]
-	// FIXME This doesn't parse the battle formats correctly.
-	Debugf("[on handlers] battle formats: %+v", m.Bot.BattleFormats)
+	m.Bot.BattleFormats = formats
 }
 
 // RecentBattles holds the roomlist JSON unmarshalling battle map.

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"sdbot/utilities"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +18,7 @@ import (
 // LoginTime contains the unix login times as values to each particular room
 // the bot has joined. This allows us to ignore messages that occurred before
 // the bot has logged in.
-var LoginTime map[string]int
+var LoginTime map[string]int = make(map[string]int)
 
 var interrupt chan os.Signal
 
@@ -27,7 +28,6 @@ type Connection struct {
 	Connected bool
 	conn      *websocket.Conn
 	queue     chan string
-	rk        Killable
 }
 
 // TODO Automatic reconnection to the socket.
@@ -67,27 +67,24 @@ var ErrUnexpectedMessageType = errors.New("sdbot: unexpected message type from t
 func (c *Connection) startReading() {
 	go func() {
 		for {
-			select {
-			case <-c.rk.Dying():
-				// Break out of the read loop when we kill its Killable.
-				return
-			default:
-				msgType, msg, err := c.conn.ReadMessage()
+			msgType, msg, err := c.conn.ReadMessage()
+			CheckErr(err)
+
+			if msgType != websocket.TextMessage && msgType != -1 {
+				Error(ErrUnexpectedMessageType)
+			}
+
+			var room string
+			messages := strings.Split(string(msg), "\n")
+
+			if string(messages[0][0]) == ">" {
+				room, messages = messages[0], messages[1:]
+			}
+
+			for _, rawmessage := range messages {
+				s, err := utilities.EncodeIncoming(rawmessage, utilities.UTF8)
 				CheckErr(err)
-
-				if msgType != websocket.TextMessage && msgType != -1 {
-					Error(ErrUnexpectedMessageType)
-				}
-
-				var room string
-				messages := strings.Split(string(msg), "\n")
-				if string(messages[0][0]) == ">" {
-					room, messages = messages[0], messages[1:]
-				}
-
-				for _, rawmessage := range messages {
-					c.parse(fmt.Sprintf("%s\n%s", room, rawmessage))
-				}
+				c.parse(fmt.Sprintf("%s\n%s", room, s))
 			}
 		}
 	}()
@@ -109,10 +106,6 @@ func (c *Connection) startSending() {
 			case <-interrupt:
 				Warn("Process was interrupted. Closing connection...")
 
-				// Kill the reading goroutine.
-				c.rk.Kill()
-				c.rk.Wait()
-
 				// Send a close frame and wait for the server to close the connection.
 				err := c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 				if err != nil {
@@ -120,6 +113,7 @@ func (c *Connection) startSending() {
 					return
 				}
 
+				// FIXME None of this seems to work as intended.
 				// Close all plugin goroutines gracefully.
 				var wg sync.WaitGroup
 				wg.Add(1)
@@ -130,7 +124,6 @@ func (c *Connection) startSending() {
 
 				select {
 				case <-done:
-					os.Exit(0)
 				case <-time.After(time.Second):
 					os.Exit(0)
 				}

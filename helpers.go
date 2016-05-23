@@ -106,6 +106,7 @@ type HasteKey struct {
 }
 
 // Haste uploads a file to Hastebin and returns the response URL.
+// TODO Cute, but perhaps this should be its own package.
 func Haste(buf io.Reader, bodyType string) (string, error) {
 	data, err := ioutil.ReadAll(buf)
 	if err != nil {

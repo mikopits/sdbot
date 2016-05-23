@@ -173,8 +173,12 @@ func (b *Bot) RegisterPlugin(p *Plugin, name string) error {
 
 	chatChannel := make(chan *Message, 64)
 	privateChannel := make(chan *Message, 64)
+	b.pccMutex.Lock()
 	b.PluginChatChannels[name] = &chatChannel
+	b.pccMutex.Unlock()
+	b.ppcMutex.Lock()
 	b.PluginPrivateChannels[name] = &privateChannel
+	b.ppcMutex.Unlock()
 
 	b.Plugins = append(b.Plugins, p)
 	p.listen()

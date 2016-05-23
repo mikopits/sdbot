@@ -36,18 +36,18 @@ import (
 
 // Killable is a struct used to control the termination of goroutines.
 type Killable struct {
-	mutex sync.Mutex
+	m     sync.Mutex
 	dying chan struct{}
 	dead  chan struct{}
 }
 
 func (k *Killable) init() {
-	k.mutex.Lock()
+	k.m.Lock()
 	if k.dead == nil {
 		k.dying = make(chan struct{})
 		k.dead = make(chan struct{})
 	}
-	k.mutex.Unlock()
+	k.m.Unlock()
 }
 
 // Dying tells us if the Killable has been requested to terminate.
@@ -71,8 +71,8 @@ func (k *Killable) Done() {
 // Kill requests termination but does not close the dead channel.
 func (k *Killable) Kill() {
 	k.init()
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
+	k.m.Lock()
+	defer k.m.Unlock()
 	select {
 	case <-k.dying:
 	default:
