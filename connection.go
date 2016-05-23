@@ -26,8 +26,18 @@ var interrupt chan os.Signal
 type Connection struct {
 	Bot       *Bot
 	Connected bool
+	LoginTime map[string]int
 	conn      *websocket.Conn
 	queue     chan string
+}
+
+// NewConnection creates a new connection for a bot.
+func NewConnection(b *Bot) *Connection {
+	return &Connection{
+		Bot:       b,
+		LoginTime: make(map[string]int),
+		queue:     make(chan string, 64),
+	}
 }
 
 // TODO Automatic reconnection to the socket.
@@ -157,9 +167,8 @@ func (c *Connection) parse(s string) {
 
 	cmd := strings.ToLower(m.Command)
 
-	switch cmd {
-	case ":":
-		LoginTime[m.Room.Name] = m.Timestamp
+	if cmd == ":" {
+		c.LoginTime[m.Room.Name] = m.Timestamp
 	}
 
 	callHandler(handlers, cmd, m)

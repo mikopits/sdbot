@@ -50,10 +50,7 @@ func NewBot() *Bot {
 		RecentBattles:         make(chan *RecentBattles, 1),
 	}
 	b.Nick = b.Config.Nick
-	b.Connection = &Connection{
-		Bot:   b,
-		queue: make(chan string, 64),
-	}
+	b.Connection = NewConnection(b)
 	loggers = NewLoggerList(&PrettyLogger{AnyLogger{Output: os.Stderr}})
 	return b
 }

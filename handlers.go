@@ -53,8 +53,6 @@ func onChallstr(m *Message) {
 	m.Bot.login(m)
 }
 
-// AvatarSet is true if we have set the avater, and false otherwise.
-var AvatarSet bool
 var once sync.Once
 
 func onUpdateuser(m *Message) {
@@ -62,7 +60,6 @@ func onUpdateuser(m *Message) {
 	case "0":
 		if m.Bot.Config.Avatar > 0 && m.Bot.Config.Avatar <= 294 {
 			m.Bot.Connection.QueueMessage("|/avatar " + strconv.Itoa(m.Bot.Config.Avatar))
-			AvatarSet = true
 		}
 	case "1":
 		for _, r := range m.Bot.Config.Rooms {
@@ -165,10 +162,10 @@ func onPopup(m *Message) {
 }
 
 func onChat(m *Message) {
-	if LoginTime[m.Room.Name] == 0 {
+	if m.Bot.Connection.LoginTime[m.Room.Name] == 0 {
 		return
 	}
-	if m.Message != "" && m.Timestamp >= LoginTime[m.Room.Name] {
+	if m.Message != "" && m.Timestamp >= m.Bot.Connection.LoginTime[m.Room.Name] {
 		for name := range m.Bot.PluginChatChannels {
 			m.Bot.pluginChatChannelsWrite(name, m)
 		}
