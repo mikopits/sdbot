@@ -5,13 +5,19 @@ import (
 	"unicode/utf8"
 )
 
-// The string encoding options.
+// The string encoding options. Currently only support UTF-8. Don't really
+// see the merit in supporting anything else at the moment.
 const (
 	UTF8 = iota
 )
 
+// InvalidEncodingTypeErr is returned when the encoding type is not one that
+// is supported.
 var InvalidEncodingTypeErr = errors.New("sdbot/utilities: invalid string encoding type")
 
+// EncodeIncoming returns a strings that is encoded in the provided encoding
+// type. If the encoding type is invalid then we return the original string,
+// but also return an error.
 func EncodeIncoming(s string, encoding int) (string, error) {
 	switch encoding {
 	case UTF8:
