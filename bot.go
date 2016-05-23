@@ -312,3 +312,8 @@ func (b *Bot) Synchronize(name string, lambda *func() interface{}) interface{} {
 func (b *Bot) Connect() {
 	b.Connection.connect()
 }
+
+// Send queues a string onto the outgoing message queue.
+func (b *Bot) Send(s string) {
+	b.Connection.QueueMessage(s)
+}
