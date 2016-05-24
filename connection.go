@@ -7,12 +7,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"sdbot/utilities"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mikopits/sdbot/utilities"
 )
 
 // LoginTime contains the unix login times as values to each particular room
