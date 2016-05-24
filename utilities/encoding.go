@@ -11,9 +11,9 @@ const (
 	UTF8 = iota
 )
 
-// InvalidEncodingTypeErr is returned when the encoding type is not one that
+// ErrInvalidEncodingType is returned when the encoding type is not one that
 // is supported.
-var InvalidEncodingTypeErr = errors.New("sdbot/utilities: invalid string encoding type")
+var ErrInvalidEncodingType = errors.New("sdbot/utilities: invalid string encoding type")
 
 // EncodeIncoming returns a strings that is encoded in the provided encoding
 // type. If the encoding type is invalid then we return the original string,
@@ -36,6 +36,6 @@ func EncodeIncoming(s string, encoding int) (string, error) {
 		}
 		return s, nil
 	default:
-		return s, InvalidEncodingTypeErr
+		return s, ErrInvalidEncodingType
 	}
 }
