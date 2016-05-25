@@ -80,8 +80,8 @@ func (c *Connection) startReading() {
 			msgType, msg, err := c.conn.ReadMessage()
 			CheckErr(err)
 
-			if msgType != websocket.TextMessage || msgType == -1 {
-				Fatalf("sdbot: got message type %d from server", msgType)
+			if msgType != websocket.TextMessage {
+				Fatalf("sdbot: got message type %d from websocket", msgType)
 			}
 
 			var room string
