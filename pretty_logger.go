@@ -34,6 +34,8 @@ func (lo *PrettyLogger) formatMessage(s string, level int) string {
 		return formatDebug(s)
 	case levelInfo:
 		return formatInfo(s)
+	case levelFatal:
+		fallthrough
 	case levelError:
 		return formatError(s)
 	case levelIncoming:
