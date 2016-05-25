@@ -80,10 +80,6 @@ func (c *Connection) startReading() {
 			msgType, msg, err := c.conn.ReadMessage()
 			CheckErr(err)
 
-			if msgType != websocket.TextMessage && msgType != -1 {
-				Error(ErrUnexpectedMessageType)
-			}
-
 			var room string
 			messages := strings.Split(string(msg), "\n")
 
@@ -92,7 +88,7 @@ func (c *Connection) startReading() {
 			}
 
 			for _, rawmessage := range messages {
-				s, err := utilities.EncodeIncoming(rawmessage, utilities.UTF8)
+				s, err := utilities.Encode(rawmessage, utilities.UTF8)
 				CheckErr(err)
 				c.parse(fmt.Sprintf("%s\n%s", room, s))
 			}
@@ -152,9 +148,11 @@ func (c *Connection) QueueMessage(msg string) {
 
 // Sends a message upstream to the websocket ignoring the message queue.
 func send(c *Connection, s string) {
+	out, err := utilities.Encode(s, utilities.UTF8)
+	CheckErr(err)
 	logOutgoingAll(loggers, s)
 
-	err := c.conn.WriteMessage(websocket.TextMessage, []byte(s))
+	err := c.conn.WriteMessage(websocket.TextMessage, []byte(out))
 	CheckErr(err)
 }
 
