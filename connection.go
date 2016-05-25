@@ -80,6 +80,10 @@ func (c *Connection) startReading() {
 			msgType, msg, err := c.conn.ReadMessage()
 			CheckErr(err)
 
+			if msgType != websocket.TextMessage || msgType == -1 {
+				Fatalf("sdbot: got message type %d from server", msgType)
+			}
+
 			var room string
 			messages := strings.Split(string(msg), "\n")
 
@@ -148,11 +152,11 @@ func (c *Connection) QueueMessage(msg string) {
 
 // Sends a message upstream to the websocket ignoring the message queue.
 func send(c *Connection, s string) {
-	out, err := utilities.Encode(s, utilities.UTF8)
+	enc, err := utilities.Encode(s, utilities.UTF8)
 	CheckErr(err)
 	logOutgoingAll(loggers, s)
 
-	err := c.conn.WriteMessage(websocket.TextMessage, []byte(out))
+	err = c.conn.WriteMessage(websocket.TextMessage, []byte(enc))
 	CheckErr(err)
 }
 
