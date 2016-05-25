@@ -18,7 +18,7 @@ var ErrInvalidEncodingType = errors.New("sdbot/utilities: invalid string encodin
 // EncodeIncoming returns a strings that is encoded in the provided encoding
 // type. If the encoding type is invalid then we return the original string,
 // but also return an error.
-func EncodeIncoming(s string, encoding int) (string, error) {
+func Encode(s string, encoding int) (string, error) {
 	switch encoding {
 	case UTF8:
 		if !utf8.ValidString(s) {
