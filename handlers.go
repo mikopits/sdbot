@@ -87,9 +87,9 @@ func onJoin(msg *Message) {
 }
 
 func onNick(m *Message) {
-	oldNick := Sanitize(m.Params[0])
-	Rename(oldNick, m.User.Name, m.Bot)
-	if oldNick == Sanitize(m.Bot.Nick) {
+	oldNick := m.Params[0][1:]
+	Rename(oldNick, m.User.Name, m.Room, m.Bot)
+	if Sanitize(oldNick) == Sanitize(m.Bot.Nick) {
 		m.Bot.Nick = m.User.Name
 	}
 }
