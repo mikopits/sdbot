@@ -120,58 +120,58 @@ func (r *Room) RemoveUser(name string) {
 }
 
 // FindUserEnsured finds a user if it exists, creates the user if it doesn't.
-func FindUserEnsured(name string, bot *Bot) *User {
+func FindUserEnsured(name string, b *Bot) *User {
 	sn := Sanitize(name)
 
 	var updateUsers = func() interface{} {
-		if bot.UserList[sn] != nil {
-			return bot.UserList[sn]
+		if b.UserList[sn] != nil {
+			return b.UserList[sn]
 		}
 
 		user := NewUser(name)
-		bot.UserList[sn] = user
+		b.UserList[sn] = user
 
 		return user
 	}
 
-	return bot.Synchronize("room", &updateUsers).(*User)
+	return b.Synchronize("room", &updateUsers).(*User)
 }
 
 // FindRoomEnsured finds a room if it exists, creates the room if it doesn't.
-func FindRoomEnsured(name string, bot *Bot) *Room {
+func FindRoomEnsured(name string, b *Bot) *Room {
 	sn := Sanitize(name)
 
 	var updateRooms = func() interface{} {
-		if bot.RoomList[sn] != nil {
-			return bot.RoomList[sn]
+		if b.RoomList[sn] != nil {
+			return b.RoomList[sn]
 		}
 
 		room := &Room{Name: sn}
-		bot.RoomList[name] = room
+		b.RoomList[name] = room
 
 		return room
 	}
 
-	return bot.Synchronize("user", &updateRooms).(*Room)
+	return b.Synchronize("user", &updateRooms).(*Room)
 }
 
 // Rename renames a user and updates their record in the UserList.
-// TODO Test this. Doesn't seem to work as intended.
-func Rename(old string, s string, bot *Bot) {
+func Rename(old string, s string, r *Room, b *Bot) {
 	so := Sanitize(old)
 	sn := Sanitize(s)
 
 	var rename = func() interface{} {
-		if bot.UserList[so] != nil {
-			u := bot.UserList[so]
-			delete(bot.UserList, so)
-			u.Name = s
-			bot.UserList[sn] = u
+		if so == sn {
+			b.UserList[so].Name = s
+		} else {
+			r.RemoveUser(so)
+			r.AddUser(sn)
+			FindUserEnsured(s, b)
 		}
 		return nil
 	}
 
-	bot.Synchronize("user", &rename)
+	b.Synchronize("user", &rename)
 }
 
 // HasAuth checks if a user has AT LEAST a given authorization level in a given room.
