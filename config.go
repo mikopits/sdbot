@@ -27,15 +27,14 @@ type Config struct {
 }
 
 // Reads the config data from toml config file.
-func readConfig() *Config {
-	configfile := "config.toml"
-	_, err := os.Stat(configfile)
+func readConfig(path string) *Config {
+	_, err := os.Stat(path)
 	if err != nil {
-		Fatalf("Config file is missing: %s", configfile)
+		Fatalf("Config file is missing: %s", path)
 	}
 
 	var config Config
-	_, err = toml.DecodeFile(configfile, &config)
+	_, err = toml.DecodeFile(path, &config)
 	CheckErr(err)
 
 	config.generatePluginPrefixRegexp()
