@@ -36,10 +36,10 @@ type Bot struct {
 
 // NewBot creates a new instance of the Bot struct. In doing so it creates a
 // new Connection as well as adds a PrettyLogger to the Loggers that logs to
-// os.Stderr.
-func NewBot() *Bot {
+// os.Stderr. It takes a path to the configuration TOML file.
+func NewBot(path string) *Bot {
 	b := &Bot{
-		Config:                readConfig(),
+		Config:                readConfig(path),
 		UserList:              make(map[string]*User),
 		RoomList:              make(map[string]*Room),
 		Plugins:               []*Plugin{},
