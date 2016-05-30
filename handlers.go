@@ -27,6 +27,7 @@ var handlers = map[string]interface{}{
 	"tournament":    onTournament,
 	"formats":       onFormats,
 	"queryresponse": onQueryResponse,
+	"win":           onWin,
 }
 
 // callHandler uses reflection to call a handler if it exists for the given command
@@ -217,4 +218,9 @@ func onQueryResponse(m *Message) {
 		CheckErr(err)
 		m.Bot.RecentBattles <- &recentBattles
 	}
+}
+
+func onWin(m *Message) {
+	// Leave the room when somebody wins
+	m.Bot.LeaveRoom(m.Room)
 }
