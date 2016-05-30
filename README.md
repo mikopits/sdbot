@@ -43,7 +43,7 @@ import (
 )
 
 func main() {
-  b := sdbot.NewBot()
+  b := sdbot.NewBot("path/to/your/config.toml")
   b.RegisterPlugin(plugins.HelloWorldPlugin(), "hello world")
   b.RegisterPlugin(plugins.EchoPlugin(), "echo")
   b.RegisterTimedPlugin(plugins.CountPlugin(), "count")
