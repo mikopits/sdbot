@@ -101,15 +101,15 @@ func onInit(m *Message) {
 	//
 	// Note that a successful /join will trigger another init event.
 	// So be careful to not cause an infinite loop.
-	if !includes(m.Bot.Config.Rooms, m.Room.Name) {
-		m.Bot.LeaveRoom(FindRoomEnsured(m.Room.Name, m.Bot))
-		// Try to join each of the config rooms, as you may have been redirected.
-		// It is safe to call "/join [room]" if you are already in it, so there is
-		// not really a need to check.
-		for _, room := range m.Bot.Config.Rooms {
-			m.Bot.JoinRoom(FindRoomEnsured(room, m.Bot))
-		}
-	}
+	//if !includes(m.Bot.Config.Rooms, m.Room.Name) {
+	//	m.Bot.LeaveRoom(FindRoomEnsured(m.Room.Name, m.Bot))
+	//	// Try to join each of the config rooms, as you may have been redirected.
+	//	// It is safe to call "/join [room]" if you are already in it, so there is
+	//	// not really a need to check.
+	//	for _, room := range m.Bot.Config.Rooms {
+	//		m.Bot.JoinRoom(FindRoomEnsured(room, m.Bot))
+	//	}
+	//}
 }
 
 func includes(a []string, s string) bool {
