@@ -3,7 +3,6 @@ package sdbot
 import (
 	"fmt"
 	"regexp"
-	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -232,8 +231,6 @@ func (p *Plugin) parse(m *Message) []string {
 }
 
 // Starts a loop in its own goroutine listening for events.
-// Recovers errors so that the bot doesn't crash on plugin errors.
-// TODO Better output than simply debug.PrintStack()
 func (p *Plugin) listen() {
 	go func() {
 		for {
@@ -244,19 +241,7 @@ func (p *Plugin) listen() {
 					Debugf("[on plugin] Starting chat event handler goroutine for plugin `%s` with args `%+v`", p.Name, args)
 					if m.Time.Sub(p.LastUsed) > p.Cooldown {
 						p.LastUsed = m.Time
-						go func() {
-							defer func() {
-								if r := recover(); r != nil {
-									err, ok := r.(error)
-									if !ok {
-										Error(err)
-										debug.PrintStack()
-									}
-								}
-							}()
-
-							p.EventHandler.HandleEvent(m, args)
-						}()
+						go p.EventHandler.HandleEvent(m, args)
 					}
 				}
 			case m := <-p.Bot.pluginPrivateChannelsRead(p.Name):
@@ -265,19 +250,7 @@ func (p *Plugin) listen() {
 					Debugf("[on plugin] Starting private event handler goroutine for plugin `%s` with args `%+v`", p.Name, args)
 					if m.Time.Sub(p.LastUsed) > p.Cooldown {
 						p.LastUsed = m.Time
-						go func() {
-							defer func() {
-								if r := recover(); r != nil {
-									err, ok := r.(error)
-									if !ok {
-										Error(err)
-										debug.PrintStack()
-									}
-								}
-							}()
-
-							p.EventHandler.HandleEvent(m, args)
-						}()
+						go p.EventHandler.HandleEvent(m, args)
 					}
 				}
 			case <-p.k.Dying():
