@@ -147,7 +147,7 @@ func FindRoomEnsured(name string, b *Bot) *Room {
 		}
 
 		room := &Room{Name: name}
-		b.RoomList[name] = room
+		b.RoomList[sn] = room
 
 		return room
 	}
@@ -166,7 +166,8 @@ func Rename(old string, s string, r *Room, b *Bot, auths ...string) {
 		} else {
 			r.RemoveUser(so)
 			r.AddUser(sn)
-			u := FindUserEnsured(s, b)
+			FindUserEnsured(s, b)
+			u := b.UserList[sn]
 			for _, a := range auths {
 				u.AddAuth(r.Name, a)
 			}
