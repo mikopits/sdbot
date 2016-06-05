@@ -80,8 +80,9 @@ func (c *Connection) startReading() {
 			msgType, msg, err := c.conn.ReadMessage()
 			CheckErr(err)
 
-			if msgType != websocket.TextMessage {
-				Fatalf("sdbot: got message type %d from websocket", msgType)
+			if len(msg) == 0 {
+				Warnf("sdbot: breaking out of read loop on msg type (%d) and err (%s)", msgType, err.Error())
+				return
 			}
 
 			var room string
@@ -101,6 +102,7 @@ func (c *Connection) startReading() {
 }
 
 // Initiates the message sending goroutine.
+// TODO Let all plugin event handlers complete before exiting.
 func (c *Connection) startSending() {
 	go func() {
 		interrupt = make(chan os.Signal, 1)
@@ -122,15 +124,6 @@ func (c *Connection) startSending() {
 					Error(err)
 					return
 				}
-
-				// FIXME None of this seems to work as intended.
-				// Close all plugin goroutines gracefully.
-				var wg sync.WaitGroup
-				wg.Add(1)
-				c.Bot.StopTimedPlugins()
-				c.Bot.UnregisterPlugins()
-				defer wg.Done()
-				wg.Wait()
 
 				select {
 				case <-done:
