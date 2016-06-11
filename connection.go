@@ -29,6 +29,7 @@ type Connection struct {
 	LoginTime map[string]int
 	conn      *websocket.Conn
 	queue     chan string
+	reconnect chan struct{}
 }
 
 // NewConnection creates a new connection for a bot.
@@ -37,10 +38,10 @@ func NewConnection(b *Bot) *Connection {
 		Bot:       b,
 		LoginTime: make(map[string]int),
 		queue:     make(chan string, 64),
+		reconnect: make(chan struct{}),
 	}
 }
 
-// TODO Automatic reconnection to the socket.
 // Connects to the server websocket and initialize reading and writing threads.
 func (c *Connection) connect() {
 	host := c.Bot.Config.Server + ":" + c.Bot.Config.Port
@@ -77,23 +78,25 @@ var ErrUnexpectedMessageType = errors.New("sdbot: unexpected message type from t
 func (c *Connection) startReading() {
 	go func() {
 		for {
-			msgType, msg, err := c.conn.ReadMessage()
+			_, msg, err := c.conn.ReadMessage()
 			CheckErr(err)
 
-			if len(msg) == 0 {
-				Warnf("sdbot: breaking out of read loop on msg type (%d) and err (%s)", msgType, err.Error())
+			if websocket.IsCloseError(err, 1000) {
+				return
+			} else if websocket.IsCloseError(err, 1006) {
+				c.reconnect <- struct{}{}
 				return
 			}
 
 			var room string
-			messages := strings.Split(string(msg), "\n")
+			msgs := strings.Split(string(msg), "\n")
 
-			if string(messages[0][0]) == ">" {
-				room, messages = messages[0], messages[1:]
+			if string(msgs[0][0]) == ">" {
+				room, msgs = msgs[0], msgs[1:]
 			}
 
-			for _, rawmessage := range messages {
-				s, err := utilities.Encode(rawmessage, utilities.UTF8)
+			for _, raw := range msgs {
+				s, err := utilities.Encode(raw, utilities.UTF8)
 				CheckErr(err)
 				c.parse(fmt.Sprintf("%s\n%s", room, s))
 			}
@@ -102,7 +105,6 @@ func (c *Connection) startReading() {
 }
 
 // Initiates the message sending goroutine.
-// TODO Let all plugin event handlers complete before exiting.
 func (c *Connection) startSending() {
 	go func() {
 		interrupt = make(chan os.Signal, 1)
@@ -115,6 +117,11 @@ func (c *Connection) startSending() {
 				send(c, msg)
 				ms := 1000.0 / c.Bot.Config.MessagesPerSecond
 				time.Sleep(time.Duration(ms) * time.Millisecond)
+			case <-c.reconnect:
+				Debug("connection: waiting 3 seconds before reconnect attempt.")
+				time.Sleep(time.Second * 3)
+				c.Bot.Connect()
+				return
 			case <-interrupt:
 				Warn("Process was interrupted. Closing connection...")
 
