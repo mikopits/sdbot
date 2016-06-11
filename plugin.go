@@ -41,7 +41,7 @@ type Plugin struct {
 	Cooldown     time.Duration
 	LastUsed     time.Time
 	EventHandler EventHandler
-	k            Killable
+	kill         chan struct{}
 }
 
 // TimedPlugin structs will fire an event on a regular schedule defined by the
@@ -60,7 +60,7 @@ type TimedPlugin struct {
 	Ticker            *time.Ticker
 	Period            time.Duration
 	TimedEventHandler TimedEventHandler
-	k                 Killable
+	kill              chan struct{}
 }
 
 // DefaultEventHandler is the default event handler that you can make use of
@@ -131,12 +131,6 @@ func NewTimedPlugin(period time.Duration) *TimedPlugin {
 	return &TimedPlugin{
 		Period: period,
 	}
-}
-
-// NewDefaultEventHandler creates a new DefaultEventHandler.
-// TODO Perhaps this isn't useful.
-func NewDefaultEventHandler(p *Plugin) *DefaultEventHandler {
-	return &DefaultEventHandler{Plugin: p}
 }
 
 // SetEventHandler sets the EventHandler of the Plugin.
@@ -253,8 +247,7 @@ func (p *Plugin) listen() {
 						go p.EventHandler.HandleEvent(m, args)
 					}
 				}
-			case <-p.k.Dying():
-				// Break out of the listen loop when we call p.k.Kill()
+			case <-p.kill:
 				return
 			}
 		}
@@ -263,8 +256,7 @@ func (p *Plugin) listen() {
 
 // Request the termination of the Plugin.Listen loop.
 func (p *Plugin) stopListening() {
-	p.k.Kill()
-	p.k.Wait()
+	p.kill <- struct{}{}
 }
 
 // Starts a loop listening on the time.Ticker.
@@ -275,8 +267,7 @@ func (tp *TimedPlugin) start() {
 			select {
 			case <-tp.Ticker.C:
 				go tp.TimedEventHandler.HandleEvent()
-			case <-tp.k.Dying():
-				// Break out of the loop when we call tp.k.Kill()
+			case <-tp.kill:
 				return
 			}
 		}
@@ -286,8 +277,7 @@ func (tp *TimedPlugin) start() {
 // Request the termination of the TimedPlugin.Start loop.
 func (tp *TimedPlugin) stop() {
 	tp.Ticker.Stop()
-	tp.k.Kill()
-	tp.k.Wait()
+	tp.kill <- struct{}{}
 }
 
 // EventHandler defines the behaviour and action of any event on a Plugin. Use
