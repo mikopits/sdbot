@@ -157,16 +157,10 @@ func FindRoomEnsured(name string, b *Bot) *Room {
 
 // Rename renames a user and updates their record in the UserList.
 func Rename(old string, s string, r *Room, b *Bot, auth string) {
-	sn := Sanitize(s)
-
 	var rename = func() interface{} {
-		if old == sn {
-			b.UserList[old].Name = s
-		} else {
-			b.RoomList[r.Name].RemoveUser(old)
-			b.RoomList[r.Name].AddUser(sn)
-			FindUserEnsured(s, b).AddAuth(r.Name, auth)
-		}
+		b.RoomList[r.Name].RemoveUser(old)
+		b.RoomList[r.Name].AddUser(s)
+		FindUserEnsured(s, b).AddAuth(r.Name, auth)
 		return nil
 	}
 
