@@ -121,11 +121,14 @@ func (r *Room) RemoveUser(name string) {
 
 // FindUserEnsured finds a user if it exists, creates the user if it doesn't.
 func FindUserEnsured(name string, b *Bot) *User {
-	sn := Sanitize(name)
-
 	var updateUsers = func() interface{} {
+		sn := Sanitize(name)
+		var u *User
+
 		if b.UserList[sn] != nil {
-			return b.UserList[sn]
+			u = b.UserList[sn]
+			u.Name = name
+			return u
 		}
 
 		user := NewUser(name)
@@ -160,7 +163,9 @@ func Rename(old string, s string, r *Room, b *Bot, auth string) {
 	var rename = func() interface{} {
 		b.RoomList[r.Name].RemoveUser(old)
 		b.RoomList[r.Name].AddUser(s)
-		FindUserEnsured(s, b).AddAuth(r.Name, auth)
+		u := FindUserEnsured(s, b)
+		u.AddAuth(r.Name, auth)
+		u.Name = s
 		return nil
 	}
 
