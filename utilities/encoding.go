@@ -15,7 +15,7 @@ const (
 // is supported.
 var ErrInvalidEncodingType = errors.New("sdbot/utilities: invalid string encoding type")
 
-// EncodeIncoming returns a strings that is encoded in the provided encoding
+// Encode returns a strings that is encoded in the provided encoding
 // type. If the encoding type is invalid then we return the original string,
 // but also return an error.
 func Encode(s string, encoding int) (string, error) {
