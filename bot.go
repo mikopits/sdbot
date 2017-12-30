@@ -86,7 +86,7 @@ func (b *Bot) login(msg *Message) {
 	CheckErr(err)
 
 	if b.Config.Password == "" {
-		b.Connection.QueueMessage(strings.Join([]string{"/trn ", b.Config.Nick, ",0,", string(body)}, ""))
+		b.Connection.QueueMessage(strings.Join([]string{"|/trn ", b.Config.Nick, ",0,", string(body)}, ""))
 	} else {
 		type LoginDetails struct {
 			Assertion string
