@@ -60,7 +60,7 @@ func TestParseChatMessage(t *testing.T) {
 		t.Errorf(`m.Message (%s) should == "ayylmao"`, m.Message)
 	}
 	if m.Message != m.Params[2] {
-		t.Errorf(`m.Message (%s) should == m.Params[1] (%s)`, m.Message, m.Params[1])
+		t.Errorf(`m.Message (%s) should == m.Params[2] (%s)`, m.Message, m.Params[1])
 	}
 }
 
