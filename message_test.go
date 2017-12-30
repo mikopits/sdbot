@@ -17,7 +17,7 @@ func TestParseChatMessage(t *testing.T) {
 		t.Fatal(`NewMessage (m) not instantiated`)
 	}
 
-	// Ensure that the command is "c" (chat message without timestamp)
+	// Ensure that the command is "c:" (chat message with timestamp)
 	if m.Command != "c:" {
 		t.Errorf(`m.Command (%s) should == "c:"`, m.Command)
 	}
