@@ -8,7 +8,7 @@ import (
 // parse the details of an incoming chat message and properly unload them
 // into a Message struct.
 func TestParseChatMessage(t *testing.T) {
-	b := initBot()
+	b := NewBot("examples/config/config_example.toml")
 	chatMsg := ">testroom\n|c:|100|+Mystifi|ayylmao"
 	m := NewMessage(chatMsg, b)
 
@@ -62,8 +62,4 @@ func TestParseChatMessage(t *testing.T) {
 	if m.Message != m.Params[2] {
 		t.Errorf(`m.Message (%s) should == m.Params[2] (%s)`, m.Message, m.Params[2])
 	}
-}
-
-func initBot() *Bot {
-	return NewBot("examples/config/config_example.toml")
 }
