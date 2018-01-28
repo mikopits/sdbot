@@ -1,4 +1,4 @@
-package sdbot
+﻿package sdbot
 
 import (
 	"fmt"
@@ -142,7 +142,7 @@ func FindUserEnsured(name string, b *Bot) *User {
 
 // FindRoomEnsured finds a room if it exists, creates the room if it doesn't.
 func FindRoomEnsured(name string, b *Bot) *Room {
-	sn := Sanitize(name)
+	sn := SanitizeRoomid(name)
 
 	var updateRooms = func() interface{} {
 		if b.RoomList[sn] != nil {

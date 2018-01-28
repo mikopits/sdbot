@@ -19,6 +19,15 @@ func Sanitize(s string) string {
 	return strings.ToLower(reg.ReplaceAllString(s, ""))
 }
 
+// SanitizeRoomid returns a new string with non-alphanumeric characters removed,
+// excepting hyphens. This is used for returning the proper roomids used on PS! -
+// groupchats are formatted as groupchat-CREATOR-NAME, and without these hyphens,
+// we are given an incorrect identifier.
+func SanitizeRoomid(s string) string {
+	reg := regexp.MustCompile("[^A-Za-z0-9-]")
+	return strings.ToLower(reg.ReplaceAllString(s, ""))
+}
+
 // Public API for access to the LoggerList loggers.
 
 // CheckErr checks if an error is nil, and if it is not, logs the error to
